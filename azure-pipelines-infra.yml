@@ -4,7 +4,7 @@ trigger:
     - main
   paths:
     include:
-    - projects/Infrastructure/*
+    - azure/*
 
 variables:
   azureServiceConnection: 'Azure Resource Group'
@@ -45,7 +45,7 @@ stages:
           export ARM_TENANT_ID=$tenantId
           export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
-          cd projects/Infrastructure/azure/environments/dev
+          cd azure/environments/dev
           
           terraform fmt -check || echo "Formatting issues found, but continuing..."
           terraform init
@@ -105,7 +105,7 @@ stages:
                 export ARM_TENANT_ID=$tenantId
                 export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
-                cd projects/Infrastructure/azure/environments/dev
+                cd azure/environments/dev
                 terraform init
                 terraform apply -auto-approve $(Build.ArtifactStagingDirectory)/dev-tfplan
               addSpnToEnvironment: true
@@ -147,7 +147,7 @@ stages:
           export ARM_TENANT_ID=$tenantId
           export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
-          cd projects/Infrastructure/azure/environments/shared
+          cd azure/environments/shared
           
           terraform fmt -check || echo "Formatting issues found, but continuing..."
           terraform init
@@ -206,7 +206,7 @@ stages:
                 export ARM_TENANT_ID=$tenantId
                 export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
-                cd projects/Infrastructure/azure/environments/shared
+                cd azure/environments/shared
                 terraform init
                 terraform apply -auto-approve $(Build.ArtifactStagingDirectory)/shared-tfplan
               addSpnToEnvironment: true
@@ -246,7 +246,7 @@ stages:
           export ARM_TENANT_ID=$tenantId
           export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
-          cd projects/Infrastructure/azure/environments/prod
+          cd azure/environments/prod
           
           terraform fmt -check || echo "Formatting issues found, but continuing..."
           terraform init
@@ -306,7 +306,7 @@ stages:
                 export ARM_TENANT_ID=$tenantId
                 export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
-                cd projects/Infrastructure/azure/environments/prod
+                cd azure/environments/prod
                 terraform init
                 terraform apply -auto-approve $(Build.ArtifactStagingDirectory)/prod-tfplan
               addSpnToEnvironment: true
