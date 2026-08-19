@@ -49,16 +49,7 @@ module "postgres" {
 
 data "azurerm_client_config" "current" {}
 
-data "azurerm_container_registry" "shared_acr" {
-  name                = "boutiqueacrshared"
-  resource_group_name = "boutique-shared-rg"
-}
 
-resource "azurerm_role_assignment" "aks_acr_pull" {
-  scope                = data.azurerm_container_registry.shared_acr.id
-  role_definition_name = "AcrPull"
-  principal_id         = module.aks.kubelet_identity_object_id
-}
 
 module "keyvault" {
   source              = "../../modules/keyvault"
