@@ -111,3 +111,31 @@ resource "azurerm_key_vault_access_policy" "app_identity_policy" {
   ]
 }
 
+resource "azurerm_key_vault_access_policy" "terraform_policy" {
+  key_vault_id = module.keyvault.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = data.azurerm_client_config.current.object_id
+
+  secret_permissions = [
+    "Get",
+    "List",
+    "Set",
+    "Delete",
+    "Recover",
+    "Backup",
+    "Restore",
+    "Purge"
+  ]
+}
+
+resource "azurerm_key_vault_secret" "db_secret" {
+  name         = "boutique-db-secret"
+  value        = jsonencode({
+    POSTGRES_HOST     = module.postgres.server_fqdn
+    POSTGRES_DB       = "postgres"
+    POSTGRES_USER     = "postgres"
+    POSTGRES_PASSWORD = var.db_password
+  })
+  key_vault_id = module.keyvault.id
+  depends_on   = [azurerm_key_vault_access_policy.terraform_policy]
+}

@@ -1,29 +1,41 @@
-# Infrastructure as Code (IaC) Guide
+# Boutique Deployment Runbook
 
-This directory contains the automated provisioning scripts for the cloud architecture backing the Boutique application.
+This guide outlines the steps required to completely tear down and rebuild the Boutique application infrastructure and GitOps deployments from scratch. All previous manual workarounds have been automated within the codebase, meaning you no longer need to run any manual Azure CLI commands during provisioning.
 
-## Directory Structure
+## 1. Complete Teardown (Destroy)
 
-```text
-Infrastructure/
-└── azure/
-    ├── environments/        # Environment-specific deployments (dev, prod, shared)
-    └── modules/             # Reusable Terraform modules (AKS, VNet, Postgres)
-```
+If you have an existing deployment, you should run the destroy pipeline to clean up Azure resources.
 
-## Terraform Methodology
+1. Navigate to **Azure DevOps > Pipelines**.
+2. Run the **Destroy Infrastructure** pipeline.
+   - It will run a `terraform plan -destroy`.
+   - Once it pauses for manual intervention, review the plan and click **Resume** to approve the actual `terraform apply -destroy`.
 
-This project utilizes a **Modular Terraform Architecture**:
-- **Modules:** Abstract away complex configurations (e.g., an AKS cluster with AGIC, or a Postgres Flexible server). They are stateless and environment-agnostic.
-- **Environments:** Concrete implementations of modules. We separate environments (`dev`, `prod`) to ensure isolation. The `shared` environment holds global resources like Container Registries and centralized tooling (SonarQube).
+## 2. Infrastructure Provisioning
 
-### State Management
-Terraform state is managed securely using **Terraform Cloud**. Each environment connects to a specific Terraform Cloud Workspace (e.g., `boutique-azure-dev`) to execute runs remotely and protect sensitive state data.
+Once the environment is clean, you can recreate the infrastructure.
 
-## VM Configuration
+1. Navigate to **Azure DevOps > Pipelines**.
+2. Run the **Boutique Infrastructure Pipeline**.
+   - This pipeline provisions the AKS cluster, Azure Key Vault, PostgreSQL Flexible Server, and Application Gateway.
+   - **Automated Enhancements:** 
+     - The Terraform script now automatically grants itself Key Vault access and provisions the `boutique-db-secret` (with your secure database credentials).
+     - It no longer requires you to manually inject the secret via the Azure CLI.
 
-While Terraform provisions the raw infrastructure, Virtual Machine configuration (like installing the **SonarQube** server) is handled automatically via cloud-init scripts passed to the VM's `custom_data` attribute.
+## 3. GitOps Synchronization (Argo CD)
 
-1. Terraform provisions an Ubuntu VM in Azure.
-2. It base64 encodes the `setup.sh` script and passes it to the VM.
-3. The VM executes the script as root on startup to install Java, PostgreSQL, and SonarQube automatically.
+After the infrastructure finishes provisioning, Argo CD handles the cluster configuration and application deployments.
+
+1. The infrastructure pipeline automatically deployed Argo CD and connected it to your `boutique-gitops` repository.
+2. In the Argo CD dashboard, verify that the `system-apps` Application is syncing correctly.
+   - **Automated Enhancements:**
+     - The External Secrets Operator now securely authenticates using **ManagedIdentity** instead of WorkloadIdentity. You do not need to hardcode or update Azure Client IDs in the YAML manifests anymore.
+     - The connection strings for the microservices are securely constructed using ExternalSecrets templating, so special characters in your database password (like `@` or `#`) are automatically URL-encoded and won't crash the Node.js applications.
+3. Wait for the `system-apps` to turn Green (Healthy).
+4. Argo CD will then deploy the `boutique-azure-dev` Application containing your microservices.
+5. All pods (including `product-service`, `auth`, `orders`, and `gateway`) should start successfully and connect to the database.
+
+## Troubleshooting
+
+- **Database Connection Issues:** If pods fail to start, check the `boutique-secrets` Kubernetes secret in the `boutique-app` namespace to verify that the templating engine successfully generated the `DATABASE_URL`s.
+- **Key Vault Access:** If External Secrets fail to sync, ensure the `aks_principal_id` (the AKS Kubelet Identity) was correctly assigned the `Get` and `List` Key Vault Access Policy in Terraform.
