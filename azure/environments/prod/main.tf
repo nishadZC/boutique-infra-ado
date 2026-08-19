@@ -49,6 +49,17 @@ module "postgres" {
 
 data "azurerm_client_config" "current" {}
 
+data "azurerm_container_registry" "shared_acr" {
+  name                = "boutiqueacrshared"
+  resource_group_name = "boutique-shared-rg"
+}
+
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  scope                = data.azurerm_container_registry.shared_acr.id
+  role_definition_name = "AcrPull"
+  principal_id         = module.aks.kubelet_identity_object_id
+}
+
 module "keyvault" {
   source              = "../../modules/keyvault"
   resource_group_name = azurerm_resource_group.rg.name
@@ -56,5 +67,42 @@ module "keyvault" {
   keyvault_name       = "${var.prefix}-kv-2026x"
   tenant_id           = data.azurerm_client_config.current.tenant_id
   aks_principal_id    = module.aks.kubelet_identity_object_id
+}
+
+# Install ArgoCD via Helm
+resource "helm_release" "argocd" {
+  name             = "argocd"
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-cd"
+  namespace        = "argocd"
+  create_namespace = true
+  version          = "5.46.8"
+
+  set {
+    name  = "server.service.type"
+    value = "ClusterIP"
+  }
+}
+
+# Workload Identity configuration
+resource "azurerm_user_assigned_identity" "app_identity" {
+  location            = azurerm_resource_group.rg.location
+  name                = "${var.prefix}-app-identity"
+  resource_group_name = azurerm_resource_group.rg.name
+}
+
+resource "azurerm_federated_identity_credential" "app_fic" {
+  name                = "${var.prefix}-app-fic"
+  resource_group_name = azurerm_resource_group.rg.name
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = module.aks.oidc_issuer_url
+  parent_id           = azurerm_user_assigned_identity.app_identity.id
+  subject             = "system:serviceaccount:default:external-secrets-sa"
+}
+
+resource "azurerm_role_assignment" "kv_secrets_user" {
+  scope                = module.keyvault.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.app_identity.principal_id
 }
 
