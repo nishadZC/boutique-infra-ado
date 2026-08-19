@@ -97,7 +97,7 @@ resource "azurerm_federated_identity_credential" "app_fic" {
   audience            = ["api://AzureADTokenExchange"]
   issuer              = module.aks.oidc_issuer_url
   parent_id           = azurerm_user_assigned_identity.app_identity.id
-  subject             = "system:serviceaccount:default:external-secrets-sa"
+  subject             = "system:serviceaccount:external-secrets:external-secrets"
 }
 
 resource "azurerm_role_assignment" "kv_secrets_user" {
