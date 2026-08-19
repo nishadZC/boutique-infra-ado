@@ -100,9 +100,14 @@ resource "azurerm_federated_identity_credential" "app_fic" {
   subject             = "system:serviceaccount:external-secrets:external-secrets"
 }
 
-resource "azurerm_role_assignment" "kv_secrets_user" {
-  scope                = module.keyvault.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.app_identity.principal_id
+resource "azurerm_key_vault_access_policy" "app_identity_policy" {
+  key_vault_id = module.keyvault.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_user_assigned_identity.app_identity.principal_id
+
+  secret_permissions = [
+    "Get",
+    "List",
+  ]
 }
 
