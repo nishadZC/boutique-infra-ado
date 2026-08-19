@@ -82,4 +82,10 @@ resource "azurerm_linux_virtual_machine" "sonar" {
   }
 
   custom_data = filebase64("${path.module}/setup.sh")
+
+  lifecycle {
+    ignore_changes = [
+      vm_agent_platform_updates_enabled,
+    ]
+  }
 }
