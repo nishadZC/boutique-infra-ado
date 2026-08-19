@@ -118,7 +118,7 @@ stages:
 - stage: PlanShared
   displayName: 'Plan Shared Infrastructure'
   dependsOn: ApplyProd
-  condition: in(dependencies.ApplyProd.result, 'Succeeded', 'Skipped')
+  condition: always()
   jobs:
   - job: TerraformPlanShared
     pool:
