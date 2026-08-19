@@ -8,15 +8,74 @@ variables:
 
 stages:
 # ==========================================
-# DEV ENVIRONMENT DESTROY
+# PLAN DESTROY ENVIRONMENT
 # ==========================================
-- stage: DestroyDev
-  displayName: 'Destroy Dev Infrastructure'
+- stage: PlanDestroy
+  displayName: 'Plan Infrastructure Destroy'
   jobs:
-  - deployment: TerraformDestroyDev
+  - job: TerraformPlanDestroy
     pool:
       vmImage: 'ubuntu-latest'
-    environment: 'azure-dev-environment' # Requires manual approval
+    steps:
+    - checkout: self
+    - task: Bash@3
+      displayName: 'Install Terraform'
+      inputs:
+        targetType: 'inline'
+        script: |
+          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt update && sudo apt install terraform
+
+    - task: AzureCLI@2
+      displayName: 'Terraform Plan Destroy (Dev)'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          set -e
+          export ARM_CLIENT_ID=$servicePrincipalId
+          export ARM_CLIENT_SECRET=$servicePrincipalKey
+          export ARM_TENANT_ID=$tenantId
+          export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+          cd azure/environments/dev
+          terraform init
+          terraform plan -destroy
+        addSpnToEnvironment: true
+      env:
+        TF_VAR_db_password: $(TF_VAR_db_password)
+
+    - task: AzureCLI@2
+      displayName: 'Terraform Plan Destroy (Shared)'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          set -e
+          export ARM_CLIENT_ID=$servicePrincipalId
+          export ARM_CLIENT_SECRET=$servicePrincipalKey
+          export ARM_TENANT_ID=$tenantId
+          export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+          cd azure/environments/shared
+          terraform init
+          terraform plan -destroy
+        addSpnToEnvironment: true
+
+# ==========================================
+# APPLY DESTROY ENVIRONMENT
+# ==========================================
+- stage: ApplyDestroy
+  displayName: 'Apply Infrastructure Destroy'
+  dependsOn: PlanDestroy
+  jobs:
+  - deployment: TerraformApplyDestroy
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'azure-dev-environment' # This will trigger the one manual approval
     strategy:
       runOnce:
         deploy:
@@ -50,31 +109,6 @@ stages:
               addSpnToEnvironment: true
             env:
               TF_VAR_db_password: $(TF_VAR_db_password)
-
-# ==========================================
-# SHARED ENVIRONMENT DESTROY
-# ==========================================
-- stage: DestroyShared
-  displayName: 'Destroy Shared Infrastructure'
-  dependsOn: DestroyDev
-  jobs:
-  - deployment: TerraformDestroyShared
-    pool:
-      vmImage: 'ubuntu-latest'
-    environment: 'azure-shared-environment' # Requires manual approval
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
-          - task: Bash@3
-            displayName: 'Install Terraform'
-            inputs:
-              targetType: 'inline'
-              script: |
-                wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-                echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-                sudo apt update && sudo apt install terraform
 
           - task: AzureCLI@2
             displayName: 'Terraform Destroy (Shared)'
