@@ -166,6 +166,7 @@ stages:
 - stage: ApplyShared
   displayName: 'Apply Shared Infrastructure'
   dependsOn: PlanShared
+  condition: succeeded('PlanShared')
   jobs:
   - deployment: TerraformApplyShared
     pool:
@@ -218,6 +219,7 @@ stages:
 - stage: PlanDev
   displayName: 'Plan Dev Infrastructure'
   dependsOn: ApplyShared
+  condition: succeeded('ApplyShared')
   jobs:
   - job: TerraformPlanDev
     pool:
@@ -266,6 +268,7 @@ stages:
 - stage: ApplyDev
   displayName: 'Apply Dev Infrastructure'
   dependsOn: PlanDev
+  condition: succeeded('PlanDev')
   jobs:
   - deployment: TerraformApplyDev
     pool:
