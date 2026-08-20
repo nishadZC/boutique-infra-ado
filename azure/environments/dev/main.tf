@@ -128,7 +128,7 @@ resource "azurerm_key_vault_access_policy" "terraform_policy" {
 resource "azurerm_key_vault_secret" "db_secret" {
   name         = "boutique-db-secret"
   value        = jsonencode({
-    POSTGRES_HOST     = module.postgres.server_fqdn
+    POSTGRES_HOST     = module.postgres.fqdn
     POSTGRES_DB       = "postgres"
     POSTGRES_USER     = "postgres"
     POSTGRES_PASSWORD = var.db_password
