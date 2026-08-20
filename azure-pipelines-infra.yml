@@ -54,6 +54,7 @@ stages:
         addSpnToEnvironment: true
       env:
         TF_VAR_db_password: $(TF_VAR_db_password)
+        TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
         TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
 
     - task: PublishPipelineArtifact@1
@@ -111,14 +112,14 @@ stages:
               addSpnToEnvironment: true
             env:
               TF_VAR_db_password: $(TF_VAR_db_password)
+              TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
               TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
 # ==========================================
 # SHARED ENVIRONMENT
 # ==========================================
 - stage: PlanShared
   displayName: 'Plan Shared Infrastructure'
-  dependsOn: ApplyProd
-  condition: always()
+  dependsOn: []
   jobs:
   - job: TerraformPlanShared
     pool:
@@ -218,8 +219,7 @@ stages:
 # ==========================================
 - stage: PlanDev
   displayName: 'Plan Dev Infrastructure'
-  dependsOn: ApplyShared
-  condition: succeeded('ApplyShared')
+  dependsOn: []
   jobs:
   - job: TerraformPlanDev
     pool:
@@ -256,6 +256,7 @@ stages:
         addSpnToEnvironment: true
       env:
         TF_VAR_db_password: $(TF_VAR_db_password)
+        TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
         TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
 
     - task: PublishPipelineArtifact@1
@@ -314,6 +315,7 @@ stages:
               addSpnToEnvironment: true
             env:
               TF_VAR_db_password: $(TF_VAR_db_password)
+              TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
               TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
               
 
