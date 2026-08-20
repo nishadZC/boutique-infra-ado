@@ -109,16 +109,16 @@ stages:
               TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
 
           ${{ if ne(parameters.environmentName, 'shared') }}:
-            - task: AzureCLI@2
-              displayName: 'Install ArgoCD (${{ parameters.environmentName }})'
-              inputs:
-                azureSubscription: '${{ parameters.azureServiceConnection }}'
-                scriptType: 'bash'
-                scriptLocation: 'inlineScript'
-                inlineScript: |
-                  set -e
-                  export RG_NAME=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw resource_group_name)
-                  export CLUSTER_NAME=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw cluster_name)
-                  az aks get-credentials --resource-group $RG_NAME --name $CLUSTER_NAME --admin --overwrite-existing
-                  helm repo add argo https://argoproj.github.io/argo-helm
-                  helm upgrade --install argocd argo/argo-cd --namespace argocd --create-namespace --version 5.46.8 --set server.service.type=ClusterIP
+          - task: AzureCLI@2
+            displayName: 'Install ArgoCD (${{ parameters.environmentName }})'
+            inputs:
+              azureSubscription: '${{ parameters.azureServiceConnection }}'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -e
+                export RG_NAME=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw resource_group_name)
+                export CLUSTER_NAME=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw cluster_name)
+                az aks get-credentials --resource-group $RG_NAME --name $CLUSTER_NAME --admin --overwrite-existing
+                helm repo add argo https://argoproj.github.io/argo-helm
+                helm upgrade --install argocd argo/argo-cd --namespace argocd --create-namespace --version 5.46.8 --set server.service.type=ClusterIP
