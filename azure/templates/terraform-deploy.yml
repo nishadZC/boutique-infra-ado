@@ -40,7 +40,7 @@ stages:
           
           terraform fmt -check || echo "Formatting issues found, but continuing..."
           terraform init
-          terraform state rm helm_release.argocd || true
+          terraform state rm helm_release.argocd 2>/dev/null || true
           terraform validate
           terraform plan -var-file="${{ parameters.environmentName }}.tfvars" -out=$(Build.ArtifactStagingDirectory)/${{ parameters.environmentName }}-tfplan
         addSpnToEnvironment: true
