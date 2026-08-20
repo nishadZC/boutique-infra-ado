@@ -13,339 +13,43 @@ variables:
   tfstateContainer: 'tfstate'
 
 stages:
-# ==========================================
-# PROD ENVIRONMENT
-# ==========================================
-- stage: PlanProd
-  displayName: 'Plan Prod Infrastructure'
-  jobs:
-  - job: TerraformPlanProd
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-    - task: Bash@3
-      displayName: 'Install Terraform'
-      inputs:
-        targetType: 'inline'
-        script: |
-          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt update && sudo apt install terraform
+  # ==========================================
+  # SHARED ENVIRONMENT
+  # (Contains ACR, SonarQube - required by other envs)
+  # ==========================================
+  - template: azure/templates/terraform-deploy.yml
+    parameters:
+      environmentName: 'shared'
+      azureServiceConnection: $(azureServiceConnection)
 
-    - task: AzureCLI@2
-      displayName: 'Terraform Plan (Prod)'
-      inputs:
-        azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          set -e
-          export ARM_CLIENT_ID=$servicePrincipalId
-          export ARM_CLIENT_SECRET=$servicePrincipalKey
-          export ARM_TENANT_ID=$tenantId
-          export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+  # ==========================================
+  # DEV ENVIRONMENT
+  # ==========================================
+  - template: azure/templates/terraform-deploy.yml
+    parameters:
+      environmentName: 'dev'
+      azureServiceConnection: $(azureServiceConnection)
 
-          cd azure/environments/prod
-          
-          terraform fmt -check || echo "Formatting issues found, but continuing..."
-          terraform init
-          terraform state rm helm_release.argocd || true
-          terraform validate
-          terraform plan -var-file="prod.tfvars" -out=$(Build.ArtifactStagingDirectory)/prod-tfplan
-        addSpnToEnvironment: true
-      env:
-        TF_VAR_db_password: $(TF_VAR_db_password)
-        TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
-        TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
+  # ==========================================
+  # SIT ENVIRONMENT (Commented out for now)
+  # ==========================================
+  # - template: azure/templates/terraform-deploy.yml
+  #   parameters:
+  #     environmentName: 'sit'
+  #     azureServiceConnection: $(azureServiceConnection)
 
-    - task: PublishPipelineArtifact@1
-      displayName: 'Publish Prod Plan'
-      inputs:
-        targetPath: '$(Build.ArtifactStagingDirectory)/prod-tfplan'
-        artifact: 'prod-tfplan'
-        publishLocation: 'pipeline'
+  # ==========================================
+  # UAT ENVIRONMENT (Commented out for now)
+  # ==========================================
+  # - template: azure/templates/terraform-deploy.yml
+  #   parameters:
+  #     environmentName: 'uat'
+  #     azureServiceConnection: $(azureServiceConnection)
 
-- stage: ApplyProd
-  displayName: 'Apply Prod Infrastructure'
-  dependsOn: PlanProd
-  jobs:
-  - deployment: TerraformApplyProd
-    pool:
-      vmImage: 'ubuntu-latest'
-    environment: 'azure-prod-environment' # This allows manual approvals in DevOps!
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
-          - task: Bash@3
-            displayName: 'Install Terraform'
-            inputs:
-              targetType: 'inline'
-              script: |
-                wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-                echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-                sudo apt update && sudo apt install terraform
-
-          - task: DownloadPipelineArtifact@2
-            displayName: 'Download Prod Plan'
-            inputs:
-              buildType: 'current'
-              artifactName: 'prod-tfplan'
-              targetPath: '$(Build.ArtifactStagingDirectory)'
-
-          - task: AzureCLI@2
-            displayName: 'Terraform Apply (Prod)'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                export ARM_CLIENT_ID=$servicePrincipalId
-                export ARM_CLIENT_SECRET=$servicePrincipalKey
-                export ARM_TENANT_ID=$tenantId
-                export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-
-                cd azure/environments/prod
-                terraform init
-                terraform apply -auto-approve $(Build.ArtifactStagingDirectory)/prod-tfplan
-              addSpnToEnvironment: true
-            env:
-              TF_VAR_db_password: $(TF_VAR_db_password)
-              TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
-              TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
-
-          - task: AzureCLI@2
-            displayName: 'Install ArgoCD (Prod)'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                export RG_NAME=$(terraform -chdir=azure/environments/prod output -raw resource_group_name)
-                export CLUSTER_NAME=$(terraform -chdir=azure/environments/prod output -raw cluster_name)
-                az aks get-credentials --resource-group $RG_NAME --name $CLUSTER_NAME --admin --overwrite-existing
-                helm repo add argo https://argoproj.github.io/argo-helm
-                helm upgrade --install argocd argo/argo-cd --namespace argocd --create-namespace --version 5.46.8 --set server.service.type=ClusterIP
-# ==========================================
-# SHARED ENVIRONMENT
-# ==========================================
-- stage: PlanShared
-  displayName: 'Plan Shared Infrastructure'
-  dependsOn: []
-  jobs:
-  - job: TerraformPlanShared
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-    - task: Bash@3
-      displayName: 'Install Terraform'
-      inputs:
-        targetType: 'inline'
-        script: |
-          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt update && sudo apt install terraform
-
-    - task: AzureCLI@2
-      displayName: 'Terraform Plan (Shared)'
-      inputs:
-        azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          set -e
-          export ARM_CLIENT_ID=$servicePrincipalId
-          export ARM_CLIENT_SECRET=$servicePrincipalKey
-          export ARM_TENANT_ID=$tenantId
-          export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-
-          cd azure/environments/shared
-          
-          terraform fmt -check || echo "Formatting issues found, but continuing..."
-          terraform init
-          terraform validate
-          terraform plan -var-file="shared.tfvars" -out=$(Build.ArtifactStagingDirectory)/shared-tfplan
-        addSpnToEnvironment: true
-      env:
-        TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
-
-    - task: PublishPipelineArtifact@1
-      displayName: 'Publish Shared Plan'
-      inputs:
-        targetPath: '$(Build.ArtifactStagingDirectory)/shared-tfplan'
-        artifact: 'shared-tfplan'
-        publishLocation: 'pipeline'
-
-- stage: ApplyShared
-  displayName: 'Apply Shared Infrastructure'
-  dependsOn: PlanShared
-  condition: succeeded('PlanShared')
-  jobs:
-  - deployment: TerraformApplyShared
-    pool:
-      vmImage: 'ubuntu-latest'
-    environment: 'azure-shared-environment' # This allows manual approvals in DevOps!
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
-          - task: Bash@3
-            displayName: 'Install Terraform'
-            inputs:
-              targetType: 'inline'
-              script: |
-                wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-                echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-                sudo apt update && sudo apt install terraform
-
-          - task: DownloadPipelineArtifact@2
-            displayName: 'Download Shared Plan'
-            inputs:
-              buildType: 'current'
-              artifactName: 'shared-tfplan'
-              targetPath: '$(Build.ArtifactStagingDirectory)'
-
-          - task: AzureCLI@2
-            displayName: 'Terraform Apply (Shared)'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                export ARM_CLIENT_ID=$servicePrincipalId
-                export ARM_CLIENT_SECRET=$servicePrincipalKey
-                export ARM_TENANT_ID=$tenantId
-                export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-
-                cd azure/environments/shared
-                terraform init
-                terraform apply -auto-approve $(Build.ArtifactStagingDirectory)/shared-tfplan
-              addSpnToEnvironment: true
-            env:
-              TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
-
-# ==========================================
-# DEV ENVIRONMENT
-# ==========================================
-- stage: PlanDev
-  displayName: 'Plan Dev Infrastructure'
-  dependsOn: []
-  jobs:
-  - job: TerraformPlanDev
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-    - task: Bash@3
-      displayName: 'Install Terraform'
-      inputs:
-        targetType: 'inline'
-        script: |
-          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt update && sudo apt install terraform
-
-    - task: AzureCLI@2
-      displayName: 'Terraform Plan (Dev)'
-      inputs:
-        azureSubscription: '$(azureServiceConnection)'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          set -e
-          export ARM_CLIENT_ID=$servicePrincipalId
-          export ARM_CLIENT_SECRET=$servicePrincipalKey
-          export ARM_TENANT_ID=$tenantId
-          export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-
-          cd azure/environments/dev
-          
-          terraform fmt -check || echo "Formatting issues found, but continuing..."
-          terraform init
-          terraform state rm helm_release.argocd || true
-          terraform validate
-          terraform plan -var-file="dev.tfvars" -out=$(Build.ArtifactStagingDirectory)/dev-tfplan
-        addSpnToEnvironment: true
-      env:
-        TF_VAR_db_password: $(TF_VAR_db_password)
-        TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
-        TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
-
-    - task: PublishPipelineArtifact@1
-      displayName: 'Publish Dev Plan'
-      inputs:
-        targetPath: '$(Build.ArtifactStagingDirectory)/dev-tfplan'
-        artifact: 'dev-tfplan'
-        publishLocation: 'pipeline'
-
-- stage: ApplyDev
-  displayName: 'Apply Dev Infrastructure'
-  dependsOn: PlanDev
-  condition: succeeded('PlanDev')
-  jobs:
-  - deployment: TerraformApplyDev
-    pool:
-      vmImage: 'ubuntu-latest'
-    environment: 'azure-dev-environment' # This allows manual approvals in DevOps!
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-          - checkout: self
-          - task: Bash@3
-            displayName: 'Install Terraform'
-            inputs:
-              targetType: 'inline'
-              script: |
-                wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-                echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-                sudo apt update && sudo apt install terraform
-
-          - task: DownloadPipelineArtifact@2
-            displayName: 'Download Dev Plan'
-            inputs:
-              buildType: 'current'
-              artifactName: 'dev-tfplan'
-              targetPath: '$(Build.ArtifactStagingDirectory)'
-
-          - task: AzureCLI@2
-            displayName: 'Terraform Apply (Dev)'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                export ARM_CLIENT_ID=$servicePrincipalId
-                export ARM_CLIENT_SECRET=$servicePrincipalKey
-                export ARM_TENANT_ID=$tenantId
-                export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-
-                cd azure/environments/dev
-                terraform init
-                terraform apply -auto-approve $(Build.ArtifactStagingDirectory)/dev-tfplan
-              addSpnToEnvironment: true
-            env:
-              TF_VAR_db_password: $(TF_VAR_db_password)
-              TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
-              TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
-
-          - task: AzureCLI@2
-            displayName: 'Install ArgoCD (Dev)'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                set -e
-                export RG_NAME=$(terraform -chdir=azure/environments/dev output -raw resource_group_name)
-                export CLUSTER_NAME=$(terraform -chdir=azure/environments/dev output -raw cluster_name)
-                az aks get-credentials --resource-group $RG_NAME --name $CLUSTER_NAME --admin --overwrite-existing
-                helm repo add argo https://argoproj.github.io/argo-helm
-                helm upgrade --install argocd argo/argo-cd --namespace argocd --create-namespace --version 5.46.8 --set server.service.type=ClusterIP
-              
-
+  # ==========================================
+  # PROD ENVIRONMENT (Commented out for now)
+  # ==========================================
+  # - template: azure/templates/terraform-deploy.yml
+  #   parameters:
+  #     environmentName: 'prod'
+  #     azureServiceConnection: $(azureServiceConnection)

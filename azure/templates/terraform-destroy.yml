@@ -1,0 +1,92 @@
+parameters:
+  - name: environmentName
+    type: string
+  - name: azureServiceConnection
+    type: string
+    default: 'Azure Resource Group'
+
+stages:
+- stage: PlanDestroy_${{ parameters.environmentName }}
+  displayName: 'Plan Destroy ${{ parameters.environmentName }} Infrastructure'
+  dependsOn: []
+  jobs:
+  - job: TerraformPlanDestroy
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - checkout: self
+    - task: Bash@3
+      displayName: 'Install Terraform'
+      inputs:
+        targetType: 'inline'
+        script: |
+          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo apt update && sudo apt install terraform
+
+    - task: AzureCLI@2
+      displayName: 'Terraform Plan Destroy (${{ parameters.environmentName }})'
+      inputs:
+        azureSubscription: '${{ parameters.azureServiceConnection }}'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          set -e
+          export ARM_CLIENT_ID=$servicePrincipalId
+          export ARM_CLIENT_SECRET=$servicePrincipalKey
+          export ARM_TENANT_ID=$tenantId
+          export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+          cd azure/environments/${{ parameters.environmentName }}
+          terraform init
+          terraform plan -destroy -var-file="${{ parameters.environmentName }}.tfvars"
+        addSpnToEnvironment: true
+      env:
+        TF_VAR_db_password: $(TF_VAR_db_password)
+        TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
+        TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
+
+- stage: ApplyDestroy_${{ parameters.environmentName }}
+  displayName: 'Apply Destroy ${{ parameters.environmentName }} Infrastructure'
+  dependsOn: PlanDestroy_${{ parameters.environmentName }}
+  condition: succeeded('PlanDestroy_${{ parameters.environmentName }}')
+  jobs:
+  - deployment: TerraformApplyDestroy
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'azure-${{ parameters.environmentName }}-environment' # Triggers manual approvals in DevOps
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          - task: Bash@3
+            displayName: 'Install Terraform'
+            inputs:
+              targetType: 'inline'
+              script: |
+                wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+                echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+                sudo apt update && sudo apt install terraform
+
+          - task: AzureCLI@2
+            displayName: 'Terraform Destroy (${{ parameters.environmentName }})'
+            inputs:
+              azureSubscription: '${{ parameters.azureServiceConnection }}'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -e
+                export ARM_CLIENT_ID=$servicePrincipalId
+                export ARM_CLIENT_SECRET=$servicePrincipalKey
+                export ARM_TENANT_ID=$tenantId
+                export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+                cd azure/environments/${{ parameters.environmentName }}
+                terraform init
+                terraform destroy -auto-approve -var-file="${{ parameters.environmentName }}.tfvars"
+              addSpnToEnvironment: true
+            env:
+              TF_VAR_db_password: $(TF_VAR_db_password)
+              TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
+              TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
