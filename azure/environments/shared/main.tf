@@ -3,17 +3,13 @@ resource "azurerm_resource_group" "shared_rg" {
   location = var.location
 }
 
-resource "random_string" "acr_suffix" {
-  length  = 5
-  special = false
-  upper   = false
-}
+
 
 module "acr" {
   source              = "../../modules/acr"
   resource_group_name = azurerm_resource_group.shared_rg.name
   location            = azurerm_resource_group.shared_rg.location
-  acr_name            = "boutiqueacr${random_string.acr_suffix.result}"
+  acr_name            = "boutiqueacrshared"
 }
 
 resource "azurerm_virtual_network" "shared" {
