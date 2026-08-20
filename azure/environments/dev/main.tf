@@ -8,11 +8,11 @@ module "network" {
   resource_group_name    = azurerm_resource_group.rg.name
   location               = azurerm_resource_group.rg.location
   vnet_name              = "${var.prefix}-vnet"
-  address_space          = ["10.1.0.0/16"]
-  aks_subnet_prefix      = "10.1.1.0/24"
-  appgw_subnet_prefix    = "10.1.2.0/24"
-  postgres_subnet_prefix = "10.1.3.0/24"
-  bastion_subnet_prefix  = "10.1.4.0/24"
+  address_space          = var.vnet_address_space
+  aks_subnet_prefix      = var.aks_subnet_prefix
+  appgw_subnet_prefix    = var.appgw_subnet_prefix
+  postgres_subnet_prefix = var.postgres_subnet_prefix
+  bastion_subnet_prefix  = var.bastion_subnet_prefix
   bastion_name           = "${var.prefix}-bastion"
 }
 
@@ -51,11 +51,17 @@ data "azurerm_client_config" "current" {}
 
 
 
+resource "random_string" "kv_suffix" {
+  length  = 5
+  special = false
+  upper   = false
+}
+
 module "keyvault" {
   source              = "../../modules/keyvault"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
-  keyvault_name       = "${var.prefix}-kv-2026x"
+  keyvault_name       = "${var.prefix}-kv-${random_string.kv_suffix.result}"
   tenant_id           = data.azurerm_client_config.current.tenant_id
   aks_principal_id    = module.aks.kubelet_identity_object_id
 }

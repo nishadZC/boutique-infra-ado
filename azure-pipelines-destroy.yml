@@ -42,7 +42,7 @@ stages:
 
           cd azure/environments/dev
           terraform init
-          terraform plan -destroy
+          terraform plan -destroy -var-file="dev.tfvars"
         addSpnToEnvironment: true
       env:
         TF_VAR_db_password: $(TF_VAR_db_password)
@@ -62,7 +62,7 @@ stages:
 
           cd azure/environments/shared
           terraform init
-          terraform plan -destroy
+          terraform plan -destroy -var-file="shared.tfvars"
         addSpnToEnvironment: true
 
 # ==========================================
@@ -105,7 +105,7 @@ stages:
 
                 cd azure/environments/dev
                 terraform init
-                terraform destroy -auto-approve
+                terraform destroy -auto-approve -var-file="dev.tfvars"
               addSpnToEnvironment: true
             env:
               TF_VAR_db_password: $(TF_VAR_db_password)
@@ -125,5 +125,5 @@ stages:
 
                 cd azure/environments/shared
                 terraform init
-                terraform destroy -auto-approve
+                terraform destroy -auto-approve -var-file="shared.tfvars"
               addSpnToEnvironment: true

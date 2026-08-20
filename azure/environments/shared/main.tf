@@ -3,16 +3,22 @@ resource "azurerm_resource_group" "shared_rg" {
   location = var.location
 }
 
+resource "random_string" "acr_suffix" {
+  length  = 5
+  special = false
+  upper   = false
+}
+
 module "acr" {
   source              = "../../modules/acr"
   resource_group_name = azurerm_resource_group.shared_rg.name
   location            = azurerm_resource_group.shared_rg.location
-  acr_name            = "boutiqueacrshared"
+  acr_name            = "boutiqueacr${random_string.acr_suffix.result}"
 }
 
 resource "azurerm_virtual_network" "shared" {
   name                = "${var.prefix}-vnet"
-  address_space       = ["10.0.0.0/16"]
+  address_space       = var.vnet_address_space
   location            = azurerm_resource_group.shared_rg.location
   resource_group_name = azurerm_resource_group.shared_rg.name
 }
@@ -21,7 +27,7 @@ resource "azurerm_subnet" "sonarqube" {
   name                 = "sonarqube-subnet"
   resource_group_name  = azurerm_resource_group.shared_rg.name
   virtual_network_name = azurerm_virtual_network.shared.name
-  address_prefixes     = ["10.0.1.0/24"]
+  address_prefixes     = [var.sonarqube_subnet_prefix]
 }
 
 module "sonarqube" {

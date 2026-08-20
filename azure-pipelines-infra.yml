@@ -50,7 +50,7 @@ stages:
           terraform fmt -check || echo "Formatting issues found, but continuing..."
           terraform init
           terraform validate
-          terraform plan -out=$(Build.ArtifactStagingDirectory)/prod-tfplan
+          terraform plan -var-file="prod.tfvars" -out=$(Build.ArtifactStagingDirectory)/prod-tfplan
         addSpnToEnvironment: true
       env:
         TF_VAR_db_password: $(TF_VAR_db_password)
@@ -151,7 +151,7 @@ stages:
           terraform fmt -check || echo "Formatting issues found, but continuing..."
           terraform init
           terraform validate
-          terraform plan -out=$(Build.ArtifactStagingDirectory)/shared-tfplan
+          terraform plan -var-file="shared.tfvars" -out=$(Build.ArtifactStagingDirectory)/shared-tfplan
         addSpnToEnvironment: true
       env:
         TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
@@ -252,7 +252,7 @@ stages:
           terraform fmt -check || echo "Formatting issues found, but continuing..."
           terraform init
           terraform validate
-          terraform plan -out=$(Build.ArtifactStagingDirectory)/dev-tfplan
+          terraform plan -var-file="dev.tfvars" -out=$(Build.ArtifactStagingDirectory)/dev-tfplan
         addSpnToEnvironment: true
       env:
         TF_VAR_db_password: $(TF_VAR_db_password)
