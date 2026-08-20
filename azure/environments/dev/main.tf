@@ -136,3 +136,10 @@ resource "azurerm_key_vault_secret" "db_secret" {
   key_vault_id = module.keyvault.id
   depends_on   = [azurerm_key_vault_access_policy.terraform_policy]
 }
+
+resource "azurerm_key_vault_secret" "pagerduty_key" {
+  name         = "pagerduty-key"
+  value        = var.pagerduty_key
+  key_vault_id = module.keyvault.id
+  depends_on   = [azurerm_key_vault_access_policy.terraform_policy]
+}

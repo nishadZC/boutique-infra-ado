@@ -112,3 +112,27 @@ resource "azurerm_role_assignment" "kv_secrets_user" {
   principal_id         = azurerm_user_assigned_identity.app_identity.principal_id
 }
 
+resource "azurerm_key_vault_access_policy" "terraform_policy" {
+  key_vault_id = module.keyvault.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = data.azurerm_client_config.current.object_id
+
+  secret_permissions = [
+    "Get",
+    "List",
+    "Set",
+    "Delete",
+    "Recover",
+    "Backup",
+    "Restore",
+    "Purge"
+  ]
+}
+
+resource "azurerm_key_vault_secret" "pagerduty_key" {
+  name         = "pagerduty-key"
+  value        = var.pagerduty_key
+  key_vault_id = module.keyvault.id
+  depends_on   = [azurerm_key_vault_access_policy.terraform_policy]
+}
+
