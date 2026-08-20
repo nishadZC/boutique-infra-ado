@@ -4,14 +4,7 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.0"
     }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.12"
-    }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.25"
-    }
+
   }
   backend "azurerm" {
     resource_group_name  = "tfstate-rg"
@@ -33,18 +26,3 @@ provider "azurerm" {
   }
 }
 
-provider "helm" {
-  kubernetes {
-    host                   = module.aks.host
-    client_certificate     = module.aks.client_certificate
-    client_key             = module.aks.client_key
-    cluster_ca_certificate = module.aks.cluster_ca_certificate
-  }
-}
-
-provider "kubernetes" {
-  host                   = module.aks.host
-  client_certificate     = module.aks.client_certificate
-  client_key             = module.aks.client_key
-  cluster_ca_certificate = module.aks.cluster_ca_certificate
-}

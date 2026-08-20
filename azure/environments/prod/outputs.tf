@@ -14,6 +14,10 @@ output "resource_group_name" {
   value = azurerm_resource_group.rg.name
 }
 
+output "cluster_name" {
+  value = "${var.prefix}-aks"
+}
+
 output "app_identity_client_id" {
   value = azurerm_user_assigned_identity.app_identity.client_id
 }

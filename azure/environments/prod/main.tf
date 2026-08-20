@@ -75,20 +75,6 @@ module "keyvault" {
   aks_principal_id    = module.aks.kubelet_identity_object_id
 }
 
-# Install ArgoCD via Helm
-resource "helm_release" "argocd" {
-  name             = "argocd"
-  repository       = "https://argoproj.github.io/argo-helm"
-  chart            = "argo-cd"
-  namespace        = "argocd"
-  create_namespace = true
-  version          = "5.46.8"
-
-  set {
-    name  = "server.service.type"
-    value = "ClusterIP"
-  }
-}
 
 # Workload Identity configuration
 resource "azurerm_user_assigned_identity" "app_identity" {
