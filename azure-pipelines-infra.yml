@@ -1,10 +1,4 @@
-trigger:
-  branches:
-    include:
-    - master
-  paths:
-    include:
-    - azure/*
+trigger: none
 
 variables:
   azureServiceConnection: 'Azure Resource Group'
@@ -29,6 +23,7 @@ stages:
     parameters:
       environmentName: 'dev'
       azureServiceConnection: $(azureServiceConnection)
+      dependsOn: ['Apply_shared']
 
   # ==========================================
   # SIT ENVIRONMENT (Commented out for now)

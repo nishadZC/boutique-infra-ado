@@ -129,3 +129,34 @@ resource "azurerm_key_vault_secret" "pagerduty_key" {
   key_vault_id = module.keyvault.id
   depends_on   = [azurerm_key_vault_access_policy.terraform_policy]
 }
+
+# AGIC Role Assignments
+resource "azurerm_role_assignment" "agic_appgw_contributor" {
+  scope                = module.app_gateway.id
+  role_definition_name = "Contributor"
+  principal_id         = module.aks.ingress_application_gateway_identity
+}
+
+resource "azurerm_role_assignment" "agic_rg_reader" {
+  scope                = azurerm_resource_group.rg.id
+  role_definition_name = "Reader"
+  principal_id         = module.aks.ingress_application_gateway_identity
+}
+
+# ACR Pull Role Assignment
+data "azurerm_container_registry" "shared_acr" {
+  name                = "boutiqueacrshared"
+  resource_group_name = "boutique-shared-rg"
+}
+
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  scope                = data.azurerm_container_registry.shared_acr.id
+  role_definition_name = "AcrPull"
+  principal_id         = module.aks.kubelet_identity_object_id
+}
+
+resource "azurerm_role_assignment" "agic_network_contributor" {
+  scope                = module.network.appgw_subnet_id
+  role_definition_name = "Network Contributor"
+  principal_id         = module.aks.ingress_application_gateway_identity
+}
