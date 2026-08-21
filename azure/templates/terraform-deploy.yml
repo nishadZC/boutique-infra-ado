@@ -151,7 +151,7 @@ stages:
               displayName: 'GitOps Handoff (${{ parameters.environmentName }})'
               condition: and(succeeded(), ne('${{ parameters.environmentName }}', 'shared'))
               env:
-                SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+                GITOPS_PAT: $(GITOPS_PAT)
               inputs:
                 azureSubscription: '${{ parameters.azureServiceConnection }}'
                 addSpnToEnvironment: true
@@ -167,12 +167,11 @@ stages:
                   CLIENT_ID=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw app_identity_client_id)
                   KV_URL=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw keyvault_uri)
                   
-                  git config --global http.extraheader "AUTHORIZATION: bearer $SYSTEM_ACCESSTOKEN"
                   git config --global user.email "azure-devops@boutique.com"
                   git config --global user.name "Azure DevOps"
                   
                   rm -rf temp-gitops
-                  git clone https://dev.azure.com/makkenamqmb/Boutique%20project/_git/boutique-gitops temp-gitops
+                  git clone https://azdevops:$GITOPS_PAT@dev.azure.com/makkenamqmb/Boutique%20project/_git/boutique-gitops temp-gitops
                   cd temp-gitops
                   
                   sed -i "s|PLACEHOLDER_CLIENT_ID|$CLIENT_ID|g" azure/system-apps/external-secrets-app.yml
