@@ -147,15 +147,23 @@ stages:
                     username: azdevops
                   EOF
 
-            - task: Bash@3
+            - task: AzureCLI@2
               displayName: 'GitOps Handoff (${{ parameters.environmentName }})'
               condition: and(succeeded(), ne('${{ parameters.environmentName }}', 'shared'))
               env:
                 SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               inputs:
-                targetType: 'inline'
-                script: |
+                azureSubscription: '${{ parameters.azureServiceConnection }}'
+                addSpnToEnvironment: true
+                scriptType: 'bash'
+                scriptLocation: 'inlineScript'
+                inlineScript: |
                   set -e
+                  export ARM_CLIENT_ID=$servicePrincipalId
+                  export ARM_CLIENT_SECRET=$servicePrincipalKey
+                  export ARM_TENANT_ID=$tenantId
+                  export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                  
                   CLIENT_ID=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw app_identity_client_id)
                   KV_URL=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw keyvault_uri)
                   
