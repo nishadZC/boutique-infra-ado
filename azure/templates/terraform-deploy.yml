@@ -7,11 +7,15 @@ parameters:
   - name: dependsOn
     type: object
     default: []
+  - name: planCondition
+    type: string
+    default: 'succeeded()'
 
 stages:
 - stage: Plan_${{ parameters.environmentName }}
   displayName: 'Plan ${{ parameters.environmentName }} Infrastructure'
   dependsOn: ${{ parameters.dependsOn }}
+  condition: ${{ parameters.planCondition }}
   jobs:
   - job: TerraformPlan
     pool:
@@ -145,7 +149,7 @@ stages:
 
             - task: Bash@3
               displayName: 'GitOps Handoff (${{ parameters.environmentName }})'
-              condition: ne(parameters.environmentName, 'shared')
+              condition: and(succeeded(), ne('${{ parameters.environmentName }}', 'shared'))
               env:
                 SYSTEM_ACCESSTOKEN: $(System.AccessToken)
               inputs:

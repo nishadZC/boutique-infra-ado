@@ -24,6 +24,7 @@ stages:
       environmentName: 'dev'
       azureServiceConnection: $(azureServiceConnection)
       dependsOn: ['Apply_shared']
+      planCondition: 'always()'
 
   # ==========================================
   # SIT ENVIRONMENT (Commented out for now)
