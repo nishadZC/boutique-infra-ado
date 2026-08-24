@@ -109,38 +109,54 @@ resource "azurerm_key_vault_access_policy" "terraform_policy" {
     "Restore",
     "Purge"
   ]
+
+  lifecycle {
+    # Prevent failure if this policy already exists in Azure from a prior run
+    # Run: terraform import azurerm_key_vault_access_policy.terraform_policy <resource_id>
+    # to bring it under Terraform management without recreating it.
+    ignore_changes = all
+  }
 }
 
 resource "azurerm_key_vault_secret" "db_secret" {
-  name         = "boutique-db-secret"
-  value        = jsonencode({
+  name  = "boutique-db-secret"
+  value = jsonencode({
     POSTGRES_HOST     = module.postgres.fqdn
     POSTGRES_DB       = "postgres"
     POSTGRES_USER     = "postgres"
     POSTGRES_PASSWORD = var.db_password
   })
   key_vault_id = module.keyvault.id
-  depends_on   = [azurerm_key_vault_access_policy.terraform_policy]
+  depends_on = [
+    azurerm_key_vault_access_policy.terraform_policy,
+    azurerm_key_vault_access_policy.app_identity_policy,
+  ]
 }
 
 resource "azurerm_key_vault_secret" "pagerduty_key" {
   name         = "pagerduty-key"
   value        = var.pagerduty_key
   key_vault_id = module.keyvault.id
-  depends_on   = [azurerm_key_vault_access_policy.terraform_policy]
+  depends_on = [
+    azurerm_key_vault_access_policy.terraform_policy,
+    azurerm_key_vault_access_policy.app_identity_policy,
+  ]
 }
 
 # AGIC Role Assignments
+# depends_on module.aks ensures role assignments are destroyed BEFORE AKS on terraform destroy
 resource "azurerm_role_assignment" "agic_appgw_contributor" {
   scope                = module.app_gateway.id
   role_definition_name = "Contributor"
   principal_id         = module.aks.ingress_application_gateway_identity
+  depends_on           = [module.aks, module.app_gateway]
 }
 
 resource "azurerm_role_assignment" "agic_rg_reader" {
   scope                = azurerm_resource_group.rg.id
   role_definition_name = "Reader"
   principal_id         = module.aks.ingress_application_gateway_identity
+  depends_on           = [module.aks]
 }
 
 # ACR Pull Role Assignment
@@ -153,10 +169,12 @@ resource "azurerm_role_assignment" "aks_acr_pull" {
   scope                = data.azurerm_container_registry.shared_acr.id
   role_definition_name = "AcrPull"
   principal_id         = module.aks.kubelet_identity_object_id
+  depends_on           = [module.aks]
 }
 
 resource "azurerm_role_assignment" "agic_network_contributor" {
   scope                = module.network.appgw_subnet_id
   role_definition_name = "Network Contributor"
   principal_id         = module.aks.ingress_application_gateway_identity
+  depends_on           = [module.aks, module.network]
 }
