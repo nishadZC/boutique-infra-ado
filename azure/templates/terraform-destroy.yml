@@ -4,11 +4,14 @@ parameters:
   - name: azureServiceConnection
     type: string
     default: 'Azure Resource Group'
+  - name: dependsOn
+    type: object
+    default: []
 
 stages:
 - stage: PlanDestroy_${{ parameters.environmentName }}
   displayName: 'Plan Destroy ${{ parameters.environmentName }} Infrastructure'
-  dependsOn: []
+  dependsOn: ${{ parameters.dependsOn }}
   jobs:
   - job: TerraformPlanDestroy
     pool:
