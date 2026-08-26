@@ -1,5 +1,11 @@
 trigger: none
 
+parameters:
+  - name: runShared
+    displayName: "Run Shared Environment"
+    type: boolean
+    default: true
+
 variables:
   azureServiceConnection: 'Azure Resource Group'
   tfstateResourceGroup: 'tfstate-rg'
@@ -7,14 +13,16 @@ variables:
   tfstateContainer: 'tfstate'
 
 stages:
+
   # ==========================================
   # SHARED ENVIRONMENT
   # (Contains ACR, SonarQube - required by other envs)
   # ==========================================
-  - template: azure/templates/terraform-deploy.yml
-    parameters:
-      environmentName: 'shared'
-      azureServiceConnection: $(azureServiceConnection)
+  - ${{ if eq(parameters.runShared, true) }}:
+    - template: azure/templates/terraform-deploy.yml
+      parameters:
+        environmentName: 'shared'
+        azureServiceConnection: $(azureServiceConnection)
 
   # ==========================================
   # DEV ENVIRONMENT
@@ -23,7 +31,10 @@ stages:
     parameters:
       environmentName: 'dev'
       azureServiceConnection: $(azureServiceConnection)
-      dependsOn: ['Apply_shared']
+      ${{ if eq(parameters.runShared, true) }}:
+        dependsOn: ['Apply_shared']
+      ${{ if eq(parameters.runShared, false) }}:
+        dependsOn: []
 
   # ==========================================
   # SIT ENVIRONMENT (Commented out for now)
