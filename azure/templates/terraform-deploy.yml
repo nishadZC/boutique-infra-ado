@@ -55,7 +55,13 @@ stages:
         TF_VAR_db_password: $(TF_VAR_db_password)
         TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
         TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
-
+        TF_VAR_cloudinary_cloud_name: $(TF_VAR_cloudinary_cloud_name)
+        TF_VAR_cloudinary_api_key: $(TF_VAR_cloudinary_api_key)
+        TF_VAR_cloudinary_api_secret: $(TF_VAR_cloudinary_api_secret)
+        TF_VAR_google_client_id: $(TF_VAR_google_client_id)
+        TF_VAR_azure_maps_subscription_key: $(TF_VAR_azure_maps_subscription_key)
+        TF_VAR_razorpay_key_id: $(TF_VAR_razorpay_key_id)
+        TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
     - task: PublishPipelineArtifact@1
       displayName: 'Publish Plan'
       inputs:
@@ -114,7 +120,13 @@ stages:
               TF_VAR_db_password: $(TF_VAR_db_password)
               TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
               TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
-
+              TF_VAR_cloudinary_cloud_name: $(TF_VAR_cloudinary_cloud_name)
+              TF_VAR_cloudinary_api_key: $(TF_VAR_cloudinary_api_key)
+              TF_VAR_cloudinary_api_secret: $(TF_VAR_cloudinary_api_secret)
+              TF_VAR_google_client_id: $(TF_VAR_google_client_id)
+              TF_VAR_azure_maps_subscription_key: $(TF_VAR_azure_maps_subscription_key)
+              TF_VAR_razorpay_key_id: $(TF_VAR_razorpay_key_id)
+              TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
           - ${{ if ne(parameters.environmentName, 'shared') }}:
             - task: AzureCLI@2
               displayName: 'Install ArgoCD (${{ parameters.environmentName }})'

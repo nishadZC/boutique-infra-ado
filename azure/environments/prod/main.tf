@@ -115,6 +115,26 @@ resource "azurerm_key_vault_access_policy" "terraform_policy" {
   ]
 }
 
+resource "azurerm_key_vault_secret" "db_secret" {
+  name  = "boutique-db-secret"
+  value = jsonencode({
+    POSTGRES_HOST       = module.postgres.fqdn
+    POSTGRES_DB         = "postgres"
+    POSTGRES_USER       = "postgres"
+    POSTGRES_PASSWORD   = var.db_password
+    CLOUDINARY_CLOUD_NAME = var.cloudinary_cloud_name
+    CLOUDINARY_API_KEY    = var.cloudinary_api_key
+    CLOUDINARY_API_SECRET = var.cloudinary_api_secret
+    GOOGLE_CLIENT_ID      = var.google_client_id
+    AZURE_MAPS_SUBSCRIPTION_KEY = var.azure_maps_subscription_key
+    RAZORPAY_KEY_ID       = var.razorpay_key_id
+    RAZORPAY_KEY_SECRET   = var.razorpay_key_secret
+  })
+  key_vault_id = module.keyvault.id
+  depends_on = [
+    azurerm_key_vault_access_policy.terraform_policy
+  ]
+}
 resource "azurerm_key_vault_secret" "pagerduty_key" {
   name         = "pagerduty-key"
   value        = var.pagerduty_key

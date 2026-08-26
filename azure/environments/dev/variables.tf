@@ -47,3 +47,38 @@ variable "pagerduty_key" {
   type      = string
   sensitive = true
 }
+
+variable "cloudinary_cloud_name" {
+  type      = string
+  sensitive = true
+}
+
+variable "cloudinary_api_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "cloudinary_api_secret" {
+  type      = string
+  sensitive = true
+}
+
+variable "google_client_id" {
+  type      = string
+  sensitive = true
+}
+
+variable "azure_maps_subscription_key" {
+  type      = string
+  sensitive = true
+}
+
+variable "razorpay_key_id" {
+  type      = string
+  sensitive = true
+}
+
+variable "razorpay_key_secret" {
+  type      = string
+  sensitive = true
+}
