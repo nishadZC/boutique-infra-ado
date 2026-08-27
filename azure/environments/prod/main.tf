@@ -142,3 +142,15 @@ resource "azurerm_key_vault_secret" "pagerduty_key" {
   depends_on   = [azurerm_key_vault_access_policy.terraform_policy]
 }
 
+data "azurerm_dns_zone" "dns" {
+  name                = var.dns_zone_name
+  resource_group_name = var.dns_zone_resource_group_name
+}
+
+resource "azurerm_dns_a_record" "subdomain" {
+  name                = "prod"
+  zone_name           = data.azurerm_dns_zone.dns.name
+  resource_group_name = data.azurerm_dns_zone.dns.resource_group_name
+  ttl                 = 300
+  records             = [module.app_gateway.public_ip_address]
+}

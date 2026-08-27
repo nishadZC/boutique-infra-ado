@@ -185,3 +185,16 @@ resource "azurerm_role_assignment" "agic_network_contributor" {
   principal_id         = module.aks.ingress_application_gateway_identity
   depends_on           = [module.aks, module.network]
 }
+
+data "azurerm_dns_zone" "dns" {
+  name                = var.dns_zone_name
+  resource_group_name = var.dns_zone_resource_group_name
+}
+
+resource "azurerm_dns_a_record" "subdomain" {
+  name                = "dev"
+  zone_name           = data.azurerm_dns_zone.dns.name
+  resource_group_name = data.azurerm_dns_zone.dns.resource_group_name
+  ttl                 = 300
+  records             = [module.app_gateway.public_ip_address]
+}

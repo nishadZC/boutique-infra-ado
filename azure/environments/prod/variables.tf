@@ -82,3 +82,13 @@ variable "razorpay_key_secret" {
   type      = string
   sensitive = true
 }
+
+variable "dns_zone_name" {
+  type    = string
+  default = "paradisescubagoa.in"
+}
+
+variable "dns_zone_resource_group_name" {
+  type    = string
+  default = "DefaultResourceGroup-EUS"
+}
