@@ -74,3 +74,17 @@ resource "azurerm_subnet_network_security_group_association" "aks_nsg_assoc" {
   subnet_id                 = azurerm_subnet.aks.id
   network_security_group_id = azurerm_network_security_group.aks_nsg.id
 }
+
+resource "azurerm_network_security_rule" "allow_appgw_to_cert_manager" {
+  name                        = "AllowAppGwToCertManager"
+  priority                    = 100
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "8089"
+  source_address_prefix       = var.appgw_subnet_prefix
+  destination_address_prefix  = var.aks_subnet_prefix
+  resource_group_name         = var.resource_group_name
+  network_security_group_name = azurerm_network_security_group.aks_nsg.name
+}
