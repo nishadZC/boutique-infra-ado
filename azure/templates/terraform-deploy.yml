@@ -186,9 +186,9 @@ stages:
                   git clone https://azdevops:$GITOPS_PAT@dev.azure.com/makkenamqmb/Boutique%20project/_git/boutique-gitops temp-gitops
                   cd temp-gitops
                   
-                  sed -i "s|PLACEHOLDER_CLIENT_ID|$CLIENT_ID|g" azure/system-apps/external-secrets-app.yml
-                  sed -i "s|PLACEHOLDER_KV_URL|$KV_URL|g" azure/system-apps/cluster-secret-store.yml
-                  
+                  sed -i "s|azure.workload.identity/client-id: .*|azure.workload.identity/client-id: $CLIENT_ID|g" azure/system-apps/external-secrets-app.yml
+                  sed -i "s|vaultUrl: .*|vaultUrl: \"$KV_URL\"|g" azure/system-apps/cluster-secret-store.yml
+                  sed -i "s|tenantId: .*|tenantId: \"$ARM_TENANT_ID\"|g" azure/system-apps/cluster-secret-store.yml                  
                   git add azure/system-apps/
                   git diff --staged --quiet || git commit -m "chore: inject Workload Identity variables for ${{ parameters.environmentName }}"
                   git push origin HEAD:master
