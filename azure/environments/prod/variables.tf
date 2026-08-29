@@ -92,3 +92,8 @@ variable "dns_zone_resource_group_name" {
   type    = string
   default = "DefaultResourceGroup-EUS"
 }
+
+variable "ssh_public_key" {
+  type        = string
+  description = "SSH public key for AKS nodes"
+}

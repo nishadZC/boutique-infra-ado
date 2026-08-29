@@ -13,6 +13,13 @@ resource "azurerm_kubernetes_cluster" "aks" {
     vnet_subnet_id      = var.subnet_id
   }
 
+  linux_profile {
+    admin_username = "azureuser"
+    ssh_key {
+      key_data = var.ssh_public_key
+    }
+  }
+
   identity {
     type = "SystemAssigned"
   }

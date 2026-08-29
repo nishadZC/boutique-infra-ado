@@ -33,6 +33,7 @@ module "aks" {
   dns_prefix          = "${var.prefix}-aks"
   subnet_id           = module.network.aks_subnet_id
   app_gateway_id      = module.app_gateway.id
+  ssh_public_key      = var.ssh_public_key
 }
 
 

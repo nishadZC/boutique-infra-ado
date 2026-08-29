@@ -4,3 +4,4 @@ variable "cluster_name" { type = string }
 variable "dns_prefix" { type = string }
 variable "subnet_id" { type = string }
 variable "app_gateway_id" { type = string }
+variable "ssh_public_key" { type = string }
