@@ -22,6 +22,10 @@ output "app_identity_client_id" {
   value = azurerm_user_assigned_identity.app_identity.client_id
 }
 
+output "cert_manager_client_id" {
+  value = azurerm_user_assigned_identity.cert_manager_identity.client_id
+}
+
 output "keyvault_uri" {
   value = module.keyvault.vault_uri
 }

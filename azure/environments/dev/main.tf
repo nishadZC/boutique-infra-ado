@@ -84,6 +84,21 @@ resource "azurerm_federated_identity_credential" "app_fic" {
   subject             = "system:serviceaccount:external-secrets:external-secrets"
 }
 
+resource "azurerm_user_assigned_identity" "cert_manager_identity" {
+  location            = azurerm_resource_group.rg.location
+  name                = "${var.prefix}-cert-manager-identity"
+  resource_group_name = azurerm_resource_group.rg.name
+}
+
+resource "azurerm_federated_identity_credential" "cert_manager_fic" {
+  name                = "${var.prefix}-cert-manager-fic"
+  resource_group_name = azurerm_resource_group.rg.name
+  audience            = ["api://AzureADTokenExchange"]
+  issuer              = module.aks.oidc_issuer_url
+  parent_id           = azurerm_user_assigned_identity.cert_manager_identity.id
+  subject             = "system:serviceaccount:cert-manager:cert-manager"
+}
+
 resource "azurerm_key_vault_access_policy" "app_identity_policy" {
   key_vault_id = module.keyvault.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
@@ -190,6 +205,12 @@ resource "azurerm_role_assignment" "agic_network_contributor" {
 data "azurerm_dns_zone" "dns" {
   name                = var.dns_zone_name
   resource_group_name = var.dns_zone_resource_group_name
+}
+
+resource "azurerm_role_assignment" "cert_manager_dns_contributor" {
+  scope                = data.azurerm_dns_zone.dns.id
+  role_definition_name = "DNS Zone Contributor"
+  principal_id         = azurerm_user_assigned_identity.cert_manager_identity.principal_id
 }
 
 resource "azurerm_dns_a_record" "subdomain" {

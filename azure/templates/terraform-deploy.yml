@@ -177,6 +177,7 @@ stages:
                   export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
                   
                   CLIENT_ID=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw app_identity_client_id)
+                  CERT_MANAGER_CLIENT_ID=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw cert_manager_client_id)
                   KV_URL=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw keyvault_uri)
                   
                   git config --global user.email "azure-devops@boutique.com"
@@ -188,7 +189,10 @@ stages:
                   
                   sed -i "s|azure.workload.identity/client-id: .*|azure.workload.identity/client-id: $CLIENT_ID|g" azure/system-apps/external-secrets-app.yml
                   sed -i "s|vaultUrl: .*|vaultUrl: \"$KV_URL\"|g" azure/system-apps/cluster-secret-store.yml
-                  sed -i "s|tenantId: .*|tenantId: \"$ARM_TENANT_ID\"|g" azure/system-apps/cluster-secret-store.yml                  
+                  sed -i "s|tenantId: .*|tenantId: \"$ARM_TENANT_ID\"|g" azure/system-apps/cluster-secret-store.yml
+                  sed -i "s|azure.workload.identity/client-id: .*|azure.workload.identity/client-id: \"$CERT_MANAGER_CLIENT_ID\"|g" azure/system-apps/cert-manager-app.yml
+                  sed -i "s|clientID: .*|clientID: \"$CERT_MANAGER_CLIENT_ID\"|g" azure/system-apps/cluster-issuer.yml
+                  sed -i "s|subscriptionID: .*|subscriptionID: \"$ARM_SUBSCRIPTION_ID\"|g" azure/system-apps/cluster-issuer.yml                  
                   git add azure/system-apps/
                   git diff --staged --quiet || git commit -m "chore: inject Workload Identity variables for ${{ parameters.environmentName }}"
                   git push origin HEAD:master
