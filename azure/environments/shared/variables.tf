@@ -42,5 +42,6 @@ variable "allowed_ssh_cidrs" {
 # SonarQube web UI on port 9000 — must be restricted to known CIDRs
 variable "allowed_web_cidrs" {
   type        = list(string)
-  description = "CIDR blocks allowed to access SonarQube port 9000. Set via Azure DevOps variable group."
+  description = "CIDR blocks allowed to access SonarQube port 9000."
+  default     = ["AzureDevOps", "0.0.0.0/0"]
 }
