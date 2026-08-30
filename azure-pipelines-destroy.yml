@@ -16,13 +16,20 @@ stages:
       azureServiceConnection: $(azureServiceConnection)
 
   # ==========================================
-  # SHARED ENVIRONMENT DESTROY
+  # QA ENVIRONMENT DESTROY
   # ==========================================
   - template: azure/templates/terraform-destroy.yml
     parameters:
-      environmentName: 'shared'
+      environmentName: 'qa'
       azureServiceConnection: $(azureServiceConnection)
-      dependsOn: ['ApplyDestroy_dev']
+
+  # ==========================================
+  # STAGING ENVIRONMENT DESTROY
+  # ==========================================
+  - template: azure/templates/terraform-destroy.yml
+    parameters:
+      environmentName: 'staging'
+      azureServiceConnection: $(azureServiceConnection)
 
   # ==========================================
   # PROD ENVIRONMENT DESTROY (Commented out for now)
@@ -31,3 +38,12 @@ stages:
   #   parameters:
   #     environmentName: 'prod'
   #     azureServiceConnection: $(azureServiceConnection)
+
+  # ==========================================
+  # SHARED ENVIRONMENT DESTROY
+  # ==========================================
+  - template: azure/templates/terraform-destroy.yml
+    parameters:
+      environmentName: 'shared'
+      azureServiceConnection: $(azureServiceConnection)
+      dependsOn: ['ApplyDestroy_dev', 'ApplyDestroy_qa', 'ApplyDestroy_staging']

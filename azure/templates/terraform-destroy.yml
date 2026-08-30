@@ -107,3 +107,31 @@ stages:
               TF_VAR_azure_maps_subscription_key: $(TF_VAR_azure_maps_subscription_key)
               TF_VAR_razorpay_key_id: $(TF_VAR_razorpay_key_id)
               TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
+          - task: AzureCLI@2
+            displayName: 'GitOps Cleanup Handoff (${{ parameters.environmentName }})'
+            condition: and(succeeded(), ne('${{ parameters.environmentName }}', 'shared'))
+            env:
+              GITOPS_PAT: $(GITOPS_PAT)
+            inputs:
+              azureSubscription: '${{ parameters.azureServiceConnection }}'
+              addSpnToEnvironment: true
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -e
+                
+                git config --global user.email "azure-devops@boutique.com"
+                git config --global user.name "Azure DevOps"
+                
+                rm -rf temp-gitops
+                git clone https://azdevops:$GITOPS_PAT@dev.azure.com/makkenamqmb/Boutique%20project/_git/boutique-gitops temp-gitops
+                cd temp-gitops
+                
+                sed -i "s|externalSecretsClientId: .*|externalSecretsClientId: \"\"|g" azure/system-apps/values-${{ parameters.environmentName }}.yaml
+                sed -i "s|keyVaultUrl: .*|keyVaultUrl: \"\"|g" azure/system-apps/values-${{ parameters.environmentName }}.yaml
+                sed -i "s|tenantId: .*|tenantId: \"\"|g" azure/system-apps/values-${{ parameters.environmentName }}.yaml
+                sed -i "s|certManagerClientId: .*|certManagerClientId: \"\"|g" azure/system-apps/values-${{ parameters.environmentName }}.yaml
+                sed -i "s|subscriptionId: .*|subscriptionId: \"\"|g" azure/system-apps/values-${{ parameters.environmentName }}.yaml                  
+                git add azure/system-apps/
+                git diff --staged --quiet || git commit -m "chore: clean up Workload Identity variables for ${{ parameters.environmentName }} after destroy"
+                git push origin HEAD:master
