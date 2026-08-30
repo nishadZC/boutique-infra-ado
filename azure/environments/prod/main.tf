@@ -1,12 +1,13 @@
-resource "azurerm_resource_group" "rg" {
+module "resource_group" {
+  source   = "../../modules/resource_group"
   name     = "${var.prefix}-rg"
   location = var.location
 }
 
 module "network" {
   source                 = "../../modules/network"
-  resource_group_name    = azurerm_resource_group.rg.name
-  location               = azurerm_resource_group.rg.location
+  resource_group_name    = module.resource_group.name
+  location               = module.resource_group.location
   vnet_name              = "${var.prefix}-vnet"
   address_space          = var.vnet_address_space
   aks_subnet_prefix      = var.aks_subnet_prefix
@@ -18,8 +19,8 @@ module "network" {
 
 module "app_gateway" {
   source              = "../../modules/app_gateway"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
   app_gateway_name    = "${var.prefix}-appgw"
   vnet_name           = module.network.vnet_name
   subnet_id           = module.network.appgw_subnet_id
@@ -27,8 +28,8 @@ module "app_gateway" {
 
 module "aks" {
   source              = "../../modules/aks"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
   cluster_name        = "${var.prefix}-aks"
   dns_prefix          = "${var.prefix}-aks"
   subnet_id           = module.network.aks_subnet_id
@@ -39,8 +40,8 @@ module "aks" {
 
 module "postgres" {
   source              = "../../modules/postgres"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
   server_name         = "${var.prefix}-pg"
   admin_username      = "postgres"
   admin_password      = var.db_password
@@ -50,15 +51,10 @@ module "postgres" {
 
 data "azurerm_client_config" "current" {}
 
-data "azurerm_container_registry" "shared_acr" {
-  name                = "boutiqueacrshared"
+# Prod pulls images exclusively from the prod ACR (promoted via pipeline from shared ACR)
+data "azurerm_container_registry" "prod_acr" {
+  name                = "boutiqueacrprod"
   resource_group_name = "boutique-shared-rg"
-}
-
-resource "azurerm_role_assignment" "aks_acr_pull" {
-  scope                = data.azurerm_container_registry.shared_acr.id
-  role_definition_name = "AcrPull"
-  principal_id         = module.aks.kubelet_identity_object_id
 }
 
 resource "random_string" "kv_suffix" {
@@ -69,49 +65,29 @@ resource "random_string" "kv_suffix" {
 
 module "keyvault" {
   source              = "../../modules/keyvault"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
   keyvault_name       = "${var.prefix}-kv-${random_string.kv_suffix.result}"
   tenant_id           = data.azurerm_client_config.current.tenant_id
   aks_principal_id    = module.aks.kubelet_identity_object_id
 }
 
 
-# Workload Identity configuration
-resource "azurerm_user_assigned_identity" "app_identity" {
-  location            = azurerm_resource_group.rg.location
-  name                = "${var.prefix}-app-identity"
-  resource_group_name = azurerm_resource_group.rg.name
-}
-
-resource "azurerm_federated_identity_credential" "app_fic" {
-  name                = "${var.prefix}-app-fic"
-  resource_group_name = azurerm_resource_group.rg.name
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = module.aks.oidc_issuer_url
-  parent_id           = azurerm_user_assigned_identity.app_identity.id
-  subject             = "system:serviceaccount:external-secrets:external-secrets"
-}
-
-resource "azurerm_user_assigned_identity" "cert_manager_identity" {
-  location            = azurerm_resource_group.rg.location
-  name                = "${var.prefix}-cert-manager-identity"
-  resource_group_name = azurerm_resource_group.rg.name
-}
-
-resource "azurerm_federated_identity_credential" "cert_manager_fic" {
-  name                = "${var.prefix}-cert-manager-fic"
-  resource_group_name = azurerm_resource_group.rg.name
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = module.aks.oidc_issuer_url
-  parent_id           = azurerm_user_assigned_identity.cert_manager_identity.id
-  subject             = "system:serviceaccount:cert-manager:cert-manager"
-}
-
-resource "azurerm_role_assignment" "kv_secrets_user" {
-  scope                = module.keyvault.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.app_identity.principal_id
+module "identity" {
+  source                               = "../../modules/identity"
+  prefix                               = var.prefix
+  resource_group_name                  = module.resource_group.name
+  location                             = module.resource_group.location
+  oidc_issuer_url                      = module.aks.oidc_issuer_url
+  key_vault_id                         = module.keyvault.id
+  tenant_id                            = data.azurerm_client_config.current.tenant_id
+  dns_zone_id                          = data.azurerm_dns_zone.dns.id
+  app_gateway_id                       = module.app_gateway.id
+  appgw_subnet_id                      = module.network.appgw_subnet_id
+  resource_group_id                    = module.resource_group.id
+  prod_acr_id                          = data.azurerm_container_registry.prod_acr.id
+  ingress_application_gateway_identity = module.aks.ingress_application_gateway_identity
+  kubelet_identity_object_id           = module.aks.kubelet_identity_object_id
 }
 
 resource "azurerm_key_vault_access_policy" "terraform_policy" {
@@ -132,23 +108,23 @@ resource "azurerm_key_vault_access_policy" "terraform_policy" {
 }
 
 resource "azurerm_key_vault_secret" "db_secret" {
-  name  = "boutique-db-secret"
+  name = "boutique-db-secret"
   value = jsonencode({
-    POSTGRES_HOST       = module.postgres.fqdn
-    POSTGRES_DB         = "postgres"
-    POSTGRES_USER       = "postgres"
-    POSTGRES_PASSWORD   = var.db_password
-    CLOUDINARY_CLOUD_NAME = var.cloudinary_cloud_name
-    CLOUDINARY_API_KEY    = var.cloudinary_api_key
-    CLOUDINARY_API_SECRET = var.cloudinary_api_secret
-    GOOGLE_CLIENT_ID      = var.google_client_id
+    POSTGRES_HOST               = module.postgres.fqdn
+    POSTGRES_DB                 = "postgres"
+    POSTGRES_USER               = "postgres"
+    POSTGRES_PASSWORD           = var.db_password
+    CLOUDINARY_CLOUD_NAME       = var.cloudinary_cloud_name
+    CLOUDINARY_API_KEY          = var.cloudinary_api_key
+    CLOUDINARY_API_SECRET       = var.cloudinary_api_secret
+    GOOGLE_CLIENT_ID            = var.google_client_id
     AZURE_MAPS_SUBSCRIPTION_KEY = var.azure_maps_subscription_key
-    RAZORPAY_KEY_ID       = var.razorpay_key_id
-    RAZORPAY_KEY_SECRET   = var.razorpay_key_secret
+    RAZORPAY_KEY_ID             = var.razorpay_key_id
+    RAZORPAY_KEY_SECRET         = var.razorpay_key_secret
   })
   key_vault_id = module.keyvault.id
   depends_on = [
-    azurerm_key_vault_access_policy.terraform_policy
+    module.identity.app_identity_policy_id,
   ]
 }
 resource "azurerm_key_vault_secret" "pagerduty_key" {
@@ -163,11 +139,7 @@ data "azurerm_dns_zone" "dns" {
   resource_group_name = var.dns_zone_resource_group_name
 }
 
-resource "azurerm_role_assignment" "cert_manager_dns_contributor" {
-  scope                = data.azurerm_dns_zone.dns.id
-  role_definition_name = "DNS Zone Contributor"
-  principal_id         = azurerm_user_assigned_identity.cert_manager_identity.principal_id
-}
+
 
 resource "azurerm_dns_a_record" "subdomain" {
   name                = "prod"

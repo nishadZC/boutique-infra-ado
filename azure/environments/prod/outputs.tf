@@ -11,7 +11,7 @@ output "postgres_fqdn" {
 }
 
 output "resource_group_name" {
-  value = azurerm_resource_group.rg.name
+  value = module.resource_group.name
 }
 
 output "cluster_name" {
@@ -19,11 +19,11 @@ output "cluster_name" {
 }
 
 output "app_identity_client_id" {
-  value = azurerm_user_assigned_identity.app_identity.client_id
+  value = module.identity.app_identity_client_id
 }
 
 output "cert_manager_client_id" {
-  value = azurerm_user_assigned_identity.cert_manager_identity.client_id
+  value = module.identity.cert_manager_identity_client_id
 }
 
 output "keyvault_uri" {

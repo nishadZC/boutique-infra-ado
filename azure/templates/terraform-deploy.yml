@@ -62,6 +62,9 @@ stages:
         TF_VAR_azure_maps_subscription_key: $(TF_VAR_azure_maps_subscription_key)
         TF_VAR_razorpay_key_id: $(TF_VAR_razorpay_key_id)
         TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
+        # Shared-env: restrict SSH/web access to known CIDRs (set in Azure DevOps variable group)
+        TF_VAR_allowed_ssh_cidrs: $(TF_VAR_allowed_ssh_cidrs)
+        TF_VAR_allowed_web_cidrs: $(TF_VAR_allowed_web_cidrs)
     - task: PublishPipelineArtifact@1
       displayName: 'Publish Plan'
       inputs:
@@ -127,6 +130,9 @@ stages:
               TF_VAR_azure_maps_subscription_key: $(TF_VAR_azure_maps_subscription_key)
               TF_VAR_razorpay_key_id: $(TF_VAR_razorpay_key_id)
               TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
+              # Shared-env: restrict SSH/web access to known CIDRs (set in Azure DevOps variable group)
+              TF_VAR_allowed_ssh_cidrs: $(TF_VAR_allowed_ssh_cidrs)
+              TF_VAR_allowed_web_cidrs: $(TF_VAR_allowed_web_cidrs)
           - ${{ if ne(parameters.environmentName, 'shared') }}:
             - task: AzureCLI@2
               displayName: 'Install ArgoCD (${{ parameters.environmentName }})'

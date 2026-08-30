@@ -37,25 +37,77 @@ stages:
         dependsOn: []
 
   # ==========================================
-  # SIT ENVIRONMENT (Commented out for now)
+  # QA ENVIRONMENT
   # ==========================================
-  # - template: azure/templates/terraform-deploy.yml
-  #   parameters:
-  #     environmentName: 'sit'
-  #     azureServiceConnection: $(azureServiceConnection)
+  - template: azure/templates/terraform-deploy.yml
+    parameters:
+      environmentName: 'qa'
+      azureServiceConnection: $(azureServiceConnection)
+      dependsOn: ['Apply_dev']
 
   # ==========================================
-  # UAT ENVIRONMENT (Commented out for now)
+  # STAGING ENVIRONMENT
   # ==========================================
-  # - template: azure/templates/terraform-deploy.yml
-  #   parameters:
-  #     environmentName: 'uat'
-  #     azureServiceConnection: $(azureServiceConnection)
+  - template: azure/templates/terraform-deploy.yml
+    parameters:
+      environmentName: 'staging'
+      azureServiceConnection: $(azureServiceConnection)
+      dependsOn: ['Apply_qa']
 
   # ==========================================
-  # PROD ENVIRONMENT (Commented out for now)
+  # PROMOTE IMAGES: shared-acr → prod-acr
+  # Runs after staging is verified and approved.
+  # Copies only the validated image tags to the prod ACR.
+  # Prod AKS has AcrPull on prod-acr only — it cannot pull from shared-acr.
   # ==========================================
-  # - template: azure/templates/terraform-deploy.yml
-  #   parameters:
-  #     environmentName: 'prod'
-  #     azureServiceConnection: $(azureServiceConnection)
+  - stage: Promote_Images_To_Prod
+    displayName: 'Promote Images to Prod ACR'
+    dependsOn: ['Apply_staging']
+    condition: succeeded('Apply_staging')
+    jobs:
+    - deployment: PromoteImages
+      pool:
+        vmImage: 'ubuntu-latest'
+      environment: 'azure-prod-promote-environment' # Manual approval gate: confirms staging passed before images go to prod ACR
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+            - task: AzureCLI@2
+              displayName: 'Copy images from shared-acr to prod-acr'
+              inputs:
+                azureSubscription: $(azureServiceConnection)
+                scriptType: 'bash'
+                scriptLocation: 'inlineScript'
+                inlineScript: |
+                  set -e
+                  echo "Promoting image tag: $(IMAGE_TAG)"
+
+                  SHARED_ACR="boutiqueacrshared.azurecr.io"
+                  PROD_ACR="boutiqueacrprod.azurecr.io"
+
+                  # Login to both registries
+                  az acr login --name boutiqueacrshared
+                  az acr login --name boutiqueacrprod
+
+                  # Copy each service image from shared → prod ACR
+                  # az acr import is atomic and doesn't require docker daemon
+                  for SERVICE in backend frontend; do
+                    echo "Promoting $SERVICE:$(IMAGE_TAG)"
+                    az acr import \
+                      --name boutiqueacrprod \
+                      --source $SHARED_ACR/$SERVICE:$(IMAGE_TAG) \
+                      --image $SERVICE:$(IMAGE_TAG) \
+                      --force
+                  done
+
+                  echo "Promotion complete. Prod ACR now has image tag: $(IMAGE_TAG)"
+
+  # ==========================================
+  # PROD ENVIRONMENT
+  # ==========================================
+  - template: azure/templates/terraform-deploy.yml
+    parameters:
+      environmentName: 'prod'
+      azureServiceConnection: $(azureServiceConnection)
+      dependsOn: ['Promote_Images_To_Prod']

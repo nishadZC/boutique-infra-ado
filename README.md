@@ -1,166 +1,160 @@
-# Boutique Deployment Runbook
+# Boutique Infrastructure
 
-This guide outlines the steps required to completely tear down and rebuild the Boutique application infrastructure and GitOps deployments from scratch. All previous manual workarounds have been automated within the codebase, meaning you no longer need to run any manual Azure CLI commands during provisioning.
+## Architecture Overview
 
-## 1. Complete Teardown (Destroy)
+```
+boutique-infra/
+├── azure/
+│   ├── environments/
+│   │   ├── shared/      # ACR (non-prod + prod), SonarQube — provisioned FIRST
+│   │   ├── dev/         # Development environment
+│   │   ├── qa/          # QA environment
+│   │   ├── staging/     # Staging / UAT environment
+│   │   └── prod/        # Production environment
+│   ├── modules/
+│   │   ├── resource_group/   # Reusable RG module
+│   │   ├── identity/         # Workload identities, RBAC, federated credentials
+│   │   ├── acr/              # Azure Container Registry (admin disabled, RBAC only)
+│   │   ├── aks/              # Azure Kubernetes Service
+│   │   ├── app_gateway/      # Application Gateway (AGIC)
+│   │   ├── keyvault/         # Key Vault
+│   │   ├── network/          # VNet, subnets, NSGs, Bastion
+│   │   ├── postgres/         # PostgreSQL Flexible Server
+│   │   └── sonarqube/        # SonarQube VM (SSH via Bastion only)
+│   └── templates/
+│       ├── terraform-deploy.yml   # Reusable plan + apply template
+│       └── terraform-destroy.yml  # Reusable destroy template
+├── azure-pipelines-infra.yml      # Main infrastructure pipeline
+├── azure-pipelines-destroy.yml    # Destroy pipeline
+└── .gitignore
+```
 
-If you have an existing deployment, you should run the destroy pipeline to clean up Azure resources.
+## Network Address Plan
 
-1. Navigate to **Azure DevOps > Pipelines**.
-2. Run the **Destroy Infrastructure** pipeline.
-   - It will run a `terraform plan -destroy`.
-   - Once it pauses for manual intervention, review the plan and click **Resume** to approve the actual `terraform apply -destroy`.
+| Environment | VNet CIDR      | State Key                  |
+|-------------|----------------|----------------------------|
+| shared      | 10.0.0.0/16    | shared.terraform.tfstate   |
+| dev         | 10.1.0.0/16    | dev2.terraform.tfstate     |
+| qa          | 10.3.0.0/16    | qa.terraform.tfstate       |
+| staging     | 10.4.0.0/16    | staging.terraform.tfstate  |
+| prod        | 10.2.0.0/16    | prod.terraform.tfstate     |
 
-## 2. Infrastructure Provisioning
+## Container Registry Strategy
 
-Once the environment is clean, you can recreate the infrastructure.
+| Registry             | SKU      | Used By              | CI Push? |
+|----------------------|----------|----------------------|----------|
+| `boutiqueacrshared`  | Standard | dev, qa, staging     | ✅ Yes   |
+| `boutiqueacrprod`    | Premium  | prod only            | ❌ Never |
 
-1. Navigate to **Azure DevOps > Pipelines**.
-2. Run the **Boutique Infrastructure Pipeline**.
-   - This pipeline provisions the AKS cluster, Azure Key Vault, PostgreSQL Flexible Server, and Application Gateway.
-   - **Automated Enhancements:** 
-     - The Terraform script now automatically grants itself Key Vault access and provisions the `boutique-db-secret` (with your secure database credentials).
-     - It no longer requires you to manually inject the secret via the Azure CLI.
+Images are **promoted** (not rebuilt) from `boutiqueacrshared` → `boutiqueacrprod` via `az acr import` after staging passes and a manual approval is granted.
 
-## 3. GitOps Synchronization (Argo CD)
+## Pipeline Flow
 
-After the infrastructure finishes provisioning, Argo CD handles the cluster configuration and application deployments.
+```
+shared → dev → qa → staging → [Approve] → Promote Images → [Approve] → prod
+```
 
-1. The infrastructure pipeline automatically deployed Argo CD and connected it to your `boutique-gitops` repository.
-2. In the Argo CD dashboard, verify that the `system-apps` Application is syncing correctly.
-   - **Automated Enhancements:**
-     - The External Secrets Operator now securely authenticates using **ManagedIdentity** instead of WorkloadIdentity. You do not need to hardcode or update Azure Client IDs in the YAML manifests anymore.
-     - The connection strings for the microservices are securely constructed using ExternalSecrets templating, so special characters in your database password (like `@` or `#`) are automatically URL-encoded and won't crash the Node.js applications.
-3. Wait for the `system-apps` to turn Green (Healthy).
-4. Argo CD will then deploy the `boutique-azure-dev` Application containing your microservices.
-5. All pods (including `product-service`, `auth`, `orders`, and `gateway`) should start successfully and connect to the database.
+### Azure DevOps Environments Required
 
-## Troubleshooting
+| Environment Name                | Approval Required |
+|---------------------------------|-------------------|
+| `azure-shared-environment`      | ❌ No             |
+| `azure-dev-environment`         | ❌ No             |
+| `azure-qa-environment`          | Optional          |
+| `azure-staging-environment`     | Optional          |
+| `azure-prod-promote-environment`| ✅ Yes            |
+| `azure-prod-environment`        | ✅ Yes            |
 
-- **Database Connection Issues:** If pods fail to start, check the `boutique-secrets` Kubernetes secret in the `boutique-app` namespace to verify that the templating engine successfully generated the `DATABASE_URL`s.
-- **Key Vault Access:** If External Secrets fail to sync, ensure the `aks_principal_id` (the AKS Kubelet Identity) was correctly assigned the `Get` and `List` Key Vault Access Policy in Terraform.
+## Azure DevOps Variable Group
+
+The following secrets must be set in an Azure DevOps Variable Group linked to the pipeline:
+
+| Variable                         | Description                                    | Secret |
+|----------------------------------|------------------------------------------------|--------|
+| `TF_VAR_db_password`             | PostgreSQL admin password                      | ✅     |
+| `TF_VAR_pagerduty_key`           | PagerDuty integration key                      | ✅     |
+| `TF_VAR_ssh_public_key`          | SSH public key for SonarQube VM                | ✅     |
+| `TF_VAR_cloudinary_cloud_name`   | Cloudinary cloud name                          | ✅     |
+| `TF_VAR_cloudinary_api_key`      | Cloudinary API key                             | ✅     |
+| `TF_VAR_cloudinary_api_secret`   | Cloudinary API secret                          | ✅     |
+| `TF_VAR_google_client_id`        | Google OAuth client ID                         | ✅     |
+| `TF_VAR_azure_maps_subscription_key` | Azure Maps key                            | ✅     |
+| `TF_VAR_razorpay_key_id`         | Razorpay key ID                                | ✅     |
+| `TF_VAR_razorpay_key_secret`     | Razorpay key secret                            | ✅     |
+| `TF_VAR_allowed_web_cidrs`       | CIDRs allowed to access SonarQube port 9000    | ❌     |
+| `TF_VAR_allowed_ssh_cidrs`       | Direct SSH CIDRs (leave empty, use Bastion)    | ❌     |
+| `GITOPS_PAT`                     | Azure DevOps PAT for boutique-gitops repo      | ✅     |
+| `IMAGE_TAG`                      | Git commit SHA of the image to promote to prod | ❌     |
+
+## Security Standards
+
+- **ACR admin disabled** — all access via RBAC (AcrPull/AcrPush) with Managed Identities
+- **No SSH port 22 open publicly** — use Azure Bastion (already provisioned in every environment's VNet)
+- **SonarQube web access** restricted to known CIDRs via `TF_VAR_allowed_web_cidrs`
+- **Explicit deny-all NSG rule** on SonarQube at priority 4096
+- **Password authentication disabled** on SonarQube VM (`disable_password_authentication = true`)
+- **Prod AKS physically cannot pull** from non-prod ACR — RBAC grants AcrPull on `boutiqueacrprod` only
+- **Two manual approval gates** before any change reaches prod
+
+## Running from Scratch
+
+### Step 1 — Provision Shared Resources (ACR + SonarQube)
+Run the **Boutique Infrastructure Pipeline** with `runShared = true`.
+The shared stage runs first. All other environments depend on its completion.
+
+### Step 2 — Provision Environments Sequentially
+The pipeline automatically provisions dev → qa → staging. Prod requires two manual approvals.
+
+### Step 3 — GitOps Handoff
+After each environment's `Apply` stage, the pipeline automatically:
+1. Installs ArgoCD on the AKS cluster
+2. Connects ArgoCD to the `boutique-gitops` repo
+3. Injects Workload Identity client IDs and Key Vault URLs into the gitops manifests
+
+### Teardown
+Run the **Destroy Infrastructure** pipeline. It runs `terraform plan -destroy` first; review the plan, then approve to proceed.
 
 ## Network Architecture
 
-This diagram illustrates how your Virtual Network (VNet) is divided into public-facing and private subnets, and how Azure Bastion and the Application Gateway secure your backend infrastructure.
-
 ```mermaid
 flowchart TD
-    %% Define styles for clarity
     classDef public fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000
     classDef private fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000
     classDef external fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
 
-    %% External Actors
-    User("🌍 External Users (Internet)"):::external
-    Admin("💻 Admin/Developer (Browser)"):::external
+    User("🌍 External Users"):::external
+    Admin("💻 Developer (Browser)"):::external
 
-    %% The Azure Virtual Network
-    subgraph VNet ["Azure Virtual Network (e.g., 10.1.0.0/16)"]
-        
-        %% Public Subnets
+    subgraph VNet ["Azure VNet (per-environment, non-overlapping CIDRs)"]
         subgraph PublicZone ["Public-Facing Subnets"]
-            AppGw["🌐 Azure Application Gateway\n(appgw-subnet: 10.1.2.0/24)\n[Public IP]"]:::public
-            Bastion["🛡️ Azure Bastion Host\n(AzureBastionSubnet: 10.1.4.0/24)\n[Public IP]"]:::public
+            AppGw["🌐 Application Gateway\n(appgw-subnet)\n[Public IP]"]:::public
+            Bastion["🛡️ Azure Bastion\n(AzureBastionSubnet)\n[Public IP]"]:::public
         end
-
-        %% Private Subnets
-        subgraph PrivateZone ["Secure Private Subnets (No Internet Access)"]
-            AKS["🚢 Azure Kubernetes Service (AKS)\n(aks-subnet: 10.1.1.0/24)\n[Private IPs]"]:::private
-            DB["🗄️ PostgreSQL Flexible Server\n(postgres-subnet: 10.1.3.0/24)\n[Private IP]"]:::private
+        subgraph PrivateZone ["Private Subnets"]
+            AKS["🚢 AKS\n(aks-subnet)\n[Private IPs]"]:::private
+            DB["🗄️ PostgreSQL\n(postgres-subnet)\n[Private IP]"]:::private
         end
-
     end
 
-    %% Define Traffic Flows
-    User -- "HTTPS (Port 443)\nWeb Traffic" --> AppGw
-    AppGw -- "Internal HTTP/S\nFiltered Traffic" --> AKS
-    
-    Admin -- "HTTPS (Port 443)\nAzure Portal" --> Bastion
-    Bastion -- "SSH (Port 22)\nAdmin Access" --> AKS
-
-    AKS -- "Postgres Protocol (Port 5432)\nDatabase Queries" --> DB
+    User -- "HTTPS" --> AppGw
+    AppGw -- "Internal HTTP/S" --> AKS
+    Admin -- "Azure Portal" --> Bastion
+    Bastion -- "SSH (no public port 22)" --> AKS
+    AKS -- "Port 5432" --> DB
 ```
-
-### 1. The "Public-Facing" Subnets (The Front Door)
-These subnets are designed to receive traffic from the outside internet. They act as a secure gateway, preventing direct access to your application servers.
-* **`appgw-subnet` (Application Gateway):** This subnet holds the Azure Application Gateway. The App Gateway gets a Public IP address and acts as your web firewall and load balancer. It accepts HTTP/HTTPS traffic from your users, filters out malicious requests, and forwards the safe traffic back to your Kubernetes cluster.
-* **`AzureBastionSubnet`:** This subnet holds Azure Bastion, which also gets a Public IP. If you ever need to SSH into a node or VM for debugging, you log in through Bastion in your browser. It allows you to securely access your infrastructure without opening SSH port 22 to the public internet.
-
-### 2. The "Private" Subnets (The Secure Backend)
-These subnets have **no public IP addresses** and cannot be reached directly from the internet. They can only be accessed by resources already inside the VNet (like your App Gateway or Bastion).
-* **`aks-subnet` (Kubernetes):** This is where your actual microservices run. Because they are on a private subnet, a hacker cannot directly attack your pods or nodes from the internet. The only way external users can reach your apps is by going through the Application Gateway first.
-* **`postgres-subnet` (Database):** This subnet is dedicated entirely to your PostgreSQL Flexible Server. It is fully isolated and locked down. The only resources allowed to talk to the database are the microservices running in the `aks-subnet`. This ensures your most critical asset (customer data) is buried deep inside the private network.
 
 ## Federated Identity & Secret Management
 
-To pull secrets (like the database password) out of Azure Key Vault without hardcoding any passwords in Kubernetes, we use **Workload Identity (OIDC)** and **Federated Identity Credentials**. 
-
-The easiest way to understand this is to imagine Azure as a **Main Corporate Office Building** and Kubernetes (AKS) as a **Specific Department** inside that building.
-
-### The Identity Flow Diagram
+Pods authenticate to Azure Key Vault using **Workload Identity (OIDC)** — no hardcoded passwords anywhere.
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    participant Pod as Kubernetes Pod (SA)
-    participant AzureAD as Azure AD (Security Desk)
-    participant KV as Azure Key Vault (Vault)
+    participant Pod as Kubernetes Pod
+    participant AzureAD as Azure AD
+    participant KV as Key Vault
 
-    Note over Pod: Wearing internal Kubernetes<br/>Service Account (SA) tag
-    Pod->>AzureAD: Presents cryptographically verified OIDC token
-    Note over AzureAD: Checks "Federated Identity"<br/>Trust Treaty
-    AzureAD-->>Pod: Returns Official Corporate ID Badge<br/>(Managed Identity)
-    Pod->>KV: Swipes Official Corporate ID Badge
-    Note over KV: Checks RBAC Policy<br/>(Key Vault Secrets User)
-    KV-->>Pod: Grants Access & Returns Database Password
+    Pod->>AzureAD: OIDC token (from AKS issuer)
+    AzureAD-->>Pod: Managed Identity token
+    Pod->>KV: Request secret with token
+    KV-->>Pod: Returns secret value
 ```
-
-### Concept Breakdown
-
-1. **Service Account (SA)**: Kubernetes issues its own internal **Department Name Tags** to the pods (applications). We created a tag called `external-secrets`. Azure Key Vault does not recognize this tag on its own.
-2. **Managed Identity (`azurerm_user_assigned_identity`)**: Think of this as an **Official Corporate ID Badge** for a robot. We told Azure to print a brand new badge called `bq-dev-app-identity`.
-3. **RBAC Role**: This is the **job title** assigned to the Official Corporate ID Badge. We gave it the title *"Key Vault Secrets User"*. 
-4. **Federated Identity Credential (OIDC)**: This is the **Trust Treaty** we signed between Kubernetes and Azure. It tells Azure Active Directory: *"If a pod shows up wearing the internal `external-secrets` name tag, trust it. Temporarily hand it the Official Corporate ID Badge (`bq-dev-app-identity`)."*
-
-Because of this setup, the pod can dynamically check out a valid Azure identity, unlock the Key Vault, and pull your database passwords—all instantly, securely, and completely password-free!
-
-## Virtual Machine Access (SSH Public-Key Cryptography)
-
-Unlike PaaS services (like Key Vault or ACR) where Azure manages the servers, IaaS services (like the SonarQube Virtual Machine) require you to manage the underlying Linux operating system. To do this securely, we use **SSH Public-Key Cryptography** instead of passwords.
-
-### How it works (The Padlock and Key)
-
-When Terraform provisions the VM, it bakes your **Public Key** (the "padlock") into a hidden file on the server called `~/.ssh/authorized_keys`. Your **Private Key** (the "metal key") never leaves your laptop. When you connect, the VM gives your laptop a complex math problem. Only your secret Private Key can solve it, proving your identity instantly.
-
-### Adding Access for a Coworker
-
-If a coworker needs access to the VM, you should **never** share your Private Key with them. Instead, you add their "padlock" to the door alongside yours:
-
-```mermaid
-flowchart LR
-    %% Define styles
-    classDef vm fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000
-    classDef laptop fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000
-
-    %% Laptops
-    subgraph Laptops ["Local Laptops (Private Keys)"]
-        Admin["💻 Your Laptop\n[Your Private Key]"]:::laptop
-        Coworker["💻 Coworker's Laptop\n[Coworker's Private Key]"]:::laptop
-    end
-
-    %% Virtual Machine
-    subgraph VM ["SonarQube Virtual Machine"]
-        AuthKeys["📁 ~/.ssh/authorized_keys\n- Your Public Key (Padlock 1)\n- Coworker's Public Key (Padlock 2)"]:::vm
-    end
-
-    %% Flow
-    Admin -- "Math Challenge Solved\n(Matches Padlock 1)" --> AuthKeys
-    Coworker -- "Math Challenge Solved\n(Matches Padlock 2)" --> AuthKeys
-```
-
-1. **They Generate Keys:** Your coworker runs `ssh-keygen` on their laptop to generate their own Private and Public keys.
-2. **They Share the Public Key:** They send you their Public Key (the `.pub` file contents). It is perfectly safe to share this over chat or email.
-3. **You Update the Server:** You SSH into the SonarQube VM and paste their Public Key on a new line inside the `~/.ssh/authorized_keys` file.
-
-Now the VM has two padlocks. When your coworker connects, the server verifies their Private Key against their specific padlock and lets them in. If they leave the company, you simply delete their line from the `authorized_keys` file to instantly revoke their access without affecting yours!
