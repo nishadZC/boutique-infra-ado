@@ -19,13 +19,12 @@ stages:
     steps:
     - checkout: self
     - task: Bash@3
-      displayName: 'Install Terraform'
+      displayName: 'Verify Terraform (pre-installed on agent)'
       inputs:
         targetType: 'inline'
         script: |
-          wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo apt update && sudo apt install terraform
+          terraform version
+          echo "Terraform is ready on self-hosted agent."
 
     - task: AzureCLI@2
       displayName: 'Terraform Plan Destroy (${{ parameters.environmentName }})'
@@ -71,13 +70,12 @@ stages:
           steps:
           - checkout: self
           - task: Bash@3
-            displayName: 'Install Terraform'
+            displayName: 'Verify Terraform (pre-installed on agent)'
             inputs:
               targetType: 'inline'
               script: |
-                wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-                echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-                sudo apt update && sudo apt install terraform
+                terraform version
+                echo "Terraform is ready on self-hosted agent."
 
           - task: AzureCLI@2
             displayName: 'Terraform Destroy (${{ parameters.environmentName }})'
