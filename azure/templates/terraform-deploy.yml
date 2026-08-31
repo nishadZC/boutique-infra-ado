@@ -19,7 +19,7 @@ stages:
   jobs:
   - job: TerraformPlan
     pool:
-      vmImage: 'ubuntu-latest'
+      name: Default
     steps:
     - task: Bash@3
       displayName: 'Install Terraform'
@@ -76,7 +76,7 @@ stages:
   jobs:
   - deployment: TerraformApply
     pool:
-      vmImage: 'ubuntu-latest'
+      name: Default
     environment: 'azure-${{ parameters.environmentName }}-environment' # Allows manual approvals in DevOps
     strategy:
       runOnce:

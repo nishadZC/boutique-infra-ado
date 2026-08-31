@@ -67,7 +67,7 @@ stages:
     jobs:
     - deployment: PromoteImages
       pool:
-        vmImage: 'ubuntu-latest'
+        name: Default
       environment: 'azure-prod-promote-environment' # Manual approval gate: confirms staging passed before images go to prod ACR
       strategy:
         runOnce:
