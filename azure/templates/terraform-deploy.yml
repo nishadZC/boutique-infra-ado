@@ -138,10 +138,14 @@ stages:
                   set -e
                   export RG_NAME=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw resource_group_name)
                   export CLUSTER_NAME=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw cluster_name)
-                  az aks get-credentials --resource-group $RG_NAME --name $CLUSTER_NAME --admin --overwrite-existing
-                  helm repo add argo https://argoproj.github.io/argo-helm
+
+                  az aks get-credentials --resource-group "$RG_NAME" --name "$CLUSTER_NAME" --admin --overwrite-existing
+
+                  helm repo remove argo >/dev/null 2>&1 || true
+                  helm repo add argo https://argoproj.github.io/argo-helm --force-update
+                  helm repo update argo
                   helm upgrade --install argocd argo/argo-cd --namespace argocd --create-namespace --version 5.46.8 --set server.service.type=ClusterIP
-                  
+
                   cat <<EOF | kubectl apply -f -
                   apiVersion: v1
                   kind: Secret
