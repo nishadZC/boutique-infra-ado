@@ -48,6 +48,10 @@ stages:
           terraform init
           terraform state rm helm_release.argocd 2>/dev/null || true
           terraform validate
+          
+          # Force a state refresh to catch any out-of-band deletions (like missing VNets)
+          terraform apply -refresh-only -auto-approve -var-file="${{ parameters.environmentName }}.tfvars" || echo "Refresh failed, continuing to plan..."
+          
           terraform plan -var-file="${{ parameters.environmentName }}.tfvars" -out=$(Build.ArtifactStagingDirectory)/${{ parameters.environmentName }}-tfplan
         addSpnToEnvironment: true
       env:
