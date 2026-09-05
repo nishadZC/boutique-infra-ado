@@ -40,34 +40,39 @@ resource "azurerm_key_vault_access_policy" "app_identity_policy" {
 }
 
 resource "azurerm_role_assignment" "agic_appgw_contributor" {
-  scope                = var.app_gateway_id
-  role_definition_name = "Contributor"
-  principal_id         = var.ingress_application_gateway_identity
+  scope                            = var.app_gateway_id
+  role_definition_name             = "Contributor"
+  principal_id                     = var.ingress_application_gateway_identity
+  skip_service_principal_aad_check = true
 }
 
 resource "azurerm_role_assignment" "agic_rg_reader" {
-  scope                = var.resource_group_id
-  role_definition_name = "Reader"
-  principal_id         = var.ingress_application_gateway_identity
+  scope                            = var.resource_group_id
+  role_definition_name             = "Reader"
+  principal_id                     = var.ingress_application_gateway_identity
+  skip_service_principal_aad_check = true
 }
 
 resource "azurerm_role_assignment" "agic_network_contributor" {
-  scope                = var.appgw_subnet_id
-  role_definition_name = "Network Contributor"
-  principal_id         = var.ingress_application_gateway_identity
+  scope                            = var.appgw_subnet_id
+  role_definition_name             = "Network Contributor"
+  principal_id                     = var.ingress_application_gateway_identity
+  skip_service_principal_aad_check = true
 }
 
 # Grant AcrPull on the correct ACR:
 # - prod environment: pulls from prod_acr_id (isolated, only promoted images)
 # - dev/qa/staging:   pulls from shared_acr_id (CI builds land here first)
 resource "azurerm_role_assignment" "aks_acr_pull" {
-  scope                = coalesce(var.prod_acr_id, var.shared_acr_id)
-  role_definition_name = "AcrPull"
-  principal_id         = var.kubelet_identity_object_id
+  scope                            = coalesce(var.prod_acr_id, var.shared_acr_id)
+  role_definition_name             = "AcrPull"
+  principal_id                     = var.kubelet_identity_object_id
+  skip_service_principal_aad_check = true
 }
 
 resource "azurerm_role_assignment" "cert_manager_dns_contributor" {
-  scope                = var.dns_zone_id
-  role_definition_name = "DNS Zone Contributor"
-  principal_id         = azurerm_user_assigned_identity.cert_manager_identity.principal_id
+  scope                            = var.dns_zone_id
+  role_definition_name             = "DNS Zone Contributor"
+  principal_id                     = azurerm_user_assigned_identity.cert_manager_identity.principal_id
+  skip_service_principal_aad_check = true
 }
