@@ -92,7 +92,45 @@ stages:
 
                 cd azure/environments/${{ parameters.environmentName }}
                 terraform init
-                terraform destroy -auto-approve -var-file="${{ parameters.environmentName }}.tfvars"
+                prefix=$(awk -F '"' '/^prefix[[:space:]]*=/{print $2; exit}' "${{ parameters.environmentName }}.tfvars")
+                resource_group="${prefix}-rg"
+                vnet_name="${prefix}-vnet"
+                destroy_attempt=1
+                max_destroy_attempts=5
+
+                while true; do
+                  destroy_log=$(mktemp)
+                  set +e
+                  terraform destroy -auto-approve -var-file="${{ parameters.environmentName }}.tfvars" 2>&1 | tee "$destroy_log"
+                  destroy_status=${PIPESTATUS[0]}
+                  set -e
+
+                  if [[ "$destroy_status" -eq 0 ]]; then
+                    rm -f "$destroy_log"
+                    break
+                  fi
+
+                  if ! grep -q "InUseSubnetCannotBeDeleted" "$destroy_log" || [[ "$destroy_attempt" -ge "$max_destroy_attempts" ]]; then
+                    rm -f "$destroy_log"
+                    exit "$destroy_status"
+                  fi
+                  rm -f "$destroy_log"
+
+                  echo "AKS managed NICs are still releasing aks-subnet; waiting before destroy retry ${destroy_attempt}/${max_destroy_attempts}."
+                  for poll_attempt in {1..30}; do
+                    subnet_references=$(az network vnet subnet show \
+                      --resource-group "$resource_group" \
+                      --vnet-name "$vnet_name" \
+                      --name aks-subnet \
+                      --query 'ipConfigurations[].id' \
+                      --output tsv 2>/dev/null || true)
+                    if [[ -z "$subnet_references" ]]; then
+                      break
+                    fi
+                    sleep 20
+                  done
+                  destroy_attempt=$((destroy_attempt + 1))
+                done
               addSpnToEnvironment: true
             env:
               TF_VAR_db_password: $(TF_VAR_db_password)
