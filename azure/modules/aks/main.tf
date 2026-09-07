@@ -6,9 +6,8 @@ resource "azurerm_kubernetes_cluster" "aks" {
   sku_tier            = "Free"
   default_node_pool {
     name                = "default"
-    enable_auto_scaling = true
-    min_count           = 1
-    max_count           = 5
+    enable_auto_scaling = false
+    node_count          = 2
     vm_size             = "Standard_E2ads_v6"
     vnet_subnet_id      = var.subnet_id
   }
