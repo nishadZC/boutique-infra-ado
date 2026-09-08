@@ -148,9 +148,7 @@ stages:
                   helm repo remove argo >/dev/null 2>&1 || true
                   helm repo add argo https://argoproj.github.io/argo-helm --force-update
                   helm repo update argo
-                  helm upgrade --install argocd argo/argo-cd --namespace argocd --create-namespace --version 5.46.8 --set server.service.type=LoadBalancer
-                  kubectl wait --for=jsonpath='{.status.loadBalancer.ingress[0].ip}' service/argocd-server --namespace argocd --timeout=10m
-                  echo "Argo CD external IP: $(kubectl get service argocd-server --namespace argocd --output jsonpath='{.status.loadBalancer.ingress[0].ip}')"
+                  helm upgrade --install argocd argo/argo-cd --namespace argocd --create-namespace --version 5.46.8 --set server.service.type=ClusterIP
 
                   cat <<EOF | kubectl apply -f -
                   apiVersion: v1
