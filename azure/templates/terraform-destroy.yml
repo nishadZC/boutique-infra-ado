@@ -132,4 +132,4 @@ stages:
                 sed -i "s|subscriptionId: .*|subscriptionId: \"\"|g" azure/system-apps/values-${{ parameters.environmentName }}.yaml                  
                 git add azure/system-apps/
                 git diff --staged --quiet || git commit -m "chore: clean up Workload Identity variables for ${{ parameters.environmentName }} after destroy"
-                git push origin HEAD:master
+                git push origin HEAD:main

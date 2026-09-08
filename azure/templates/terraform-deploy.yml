@@ -148,7 +148,9 @@ stages:
                   helm repo remove argo >/dev/null 2>&1 || true
                   helm repo add argo https://argoproj.github.io/argo-helm --force-update
                   helm repo update argo
-                  helm upgrade --install argocd argo/argo-cd --namespace argocd --create-namespace --version 5.46.8 --set server.service.type=ClusterIP
+                  helm upgrade --install argocd argo/argo-cd --namespace argocd --create-namespace --version 5.46.8 --set server.service.type=LoadBalancer
+                  kubectl wait --for=jsonpath='{.status.loadBalancer.ingress[0].ip}' service/argocd-server --namespace argocd --timeout=10m
+                  echo "Argo CD external IP: $(kubectl get service argocd-server --namespace argocd --output jsonpath='{.status.loadBalancer.ingress[0].ip}')"
 
                   cat <<EOF | kubectl apply -f -
                   apiVersion: v1
@@ -200,4 +202,4 @@ stages:
                   sed -i "s|subscriptionId: .*|subscriptionId: \"$ARM_SUBSCRIPTION_ID\"|g" azure/system-apps/values-${{ parameters.environmentName }}.yaml                  
                   git add azure/system-apps/
                   git diff --staged --quiet || git commit -m "chore: inject Workload Identity variables for ${{ parameters.environmentName }}"
-                  git push origin HEAD:master
+                  git push origin HEAD:main
