@@ -9,7 +9,7 @@ parameters:
 variables:
   azureServiceConnection: 'Azure Resource Group'
   tfstateResourceGroup: 'tfstate-rg'
-  tfstateStorageAccount: 'boutiquetfstate2026'
+  tfstateStorageAccount: 'boutiquetfstate2026v2'
   tfstateContainer: 'tfstate'
 
 stages:
