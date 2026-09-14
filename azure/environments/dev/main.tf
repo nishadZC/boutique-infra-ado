@@ -68,6 +68,11 @@ module "keyvault" {
   aks_principal_id    = module.aks.kubelet_identity_object_id
 }
 
+module "maps" {
+  source              = "../../modules/maps"
+  maps_account_name   = "${var.prefix}-maps-dev"
+  resource_group_name = module.resource_group.name
+}
 
 data "azurerm_container_registry" "shared_acr" {
   name                = "boutiqueacrshared"
@@ -126,7 +131,7 @@ resource "azurerm_key_vault_secret" "db_secret" {
     CLOUDINARY_API_KEY          = var.cloudinary_api_key
     CLOUDINARY_API_SECRET       = var.cloudinary_api_secret
     GOOGLE_CLIENT_ID            = var.google_client_id
-    AZURE_MAPS_SUBSCRIPTION_KEY = var.azure_maps_subscription_key
+    AZURE_MAPS_SUBSCRIPTION_KEY = module.maps.primary_access_key
     RAZORPAY_KEY_ID             = var.razorpay_key_id
     RAZORPAY_KEY_SECRET         = var.razorpay_key_secret
   })

@@ -68,11 +68,6 @@ variable "google_client_id" {
   sensitive = true
 }
 
-variable "azure_maps_subscription_key" {
-  type      = string
-  sensitive = true
-}
-
 variable "razorpay_key_id" {
   type      = string
   sensitive = true
