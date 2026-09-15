@@ -4,6 +4,7 @@ resource "azurerm_public_ip" "appgw" {
   location            = var.location
   allocation_method   = "Static"
   sku                 = "Standard"
+  domain_name_label   = var.domain_name_label
 }
 
 resource "azurerm_application_gateway" "appgw" {

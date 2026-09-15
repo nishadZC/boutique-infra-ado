@@ -28,10 +28,6 @@ variable "tenant_id" {
   type        = string
 }
 
-variable "dns_zone_id" {
-  description = "The ID of the Azure DNS Zone for cert-manager"
-  type        = string
-}
 
 variable "app_gateway_id" {
   description = "The ID of the Application Gateway"

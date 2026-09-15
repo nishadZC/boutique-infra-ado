@@ -66,8 +66,3 @@ resource "azurerm_role_assignment" "aks_acr_pull" {
   principal_id         = var.kubelet_identity_object_id
 }
 
-resource "azurerm_role_assignment" "cert_manager_dns_contributor" {
-  scope                = var.dns_zone_id
-  role_definition_name = "DNS Zone Contributor"
-  principal_id         = azurerm_user_assigned_identity.cert_manager_identity.principal_id
-}

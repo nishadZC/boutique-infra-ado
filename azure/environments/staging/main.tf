@@ -24,6 +24,7 @@ module "app_gateway" {
   app_gateway_name    = "${var.prefix}-appgw"
   vnet_name           = module.network.vnet_name
   subnet_id           = module.network.appgw_subnet_id
+  domain_name_label   = "${var.prefix}-app-staging-${random_string.kv_suffix.result}"
 }
 
 module "aks" {
@@ -82,7 +83,6 @@ module "identity" {
   oidc_issuer_url                      = module.aks.oidc_issuer_url
   key_vault_id                         = module.keyvault.id
   tenant_id                            = data.azurerm_client_config.current.tenant_id
-  dns_zone_id                          = data.azurerm_dns_zone.dns.id
   app_gateway_id                       = module.app_gateway.id
   appgw_subnet_id                      = module.network.appgw_subnet_id
   resource_group_id                    = module.resource_group.id
@@ -148,18 +148,3 @@ resource "azurerm_key_vault_secret" "pagerduty_key" {
 }
 
 # Role assignments are now managed by the identity module
-
-data "azurerm_dns_zone" "dns" {
-  name                = var.dns_zone_name
-  resource_group_name = var.dns_zone_resource_group_name
-}
-
-
-
-resource "azurerm_dns_a_record" "subdomain" {
-  name                = "dev"
-  zone_name           = data.azurerm_dns_zone.dns.name
-  resource_group_name = data.azurerm_dns_zone.dns.resource_group_name
-  ttl                 = 300
-  records             = [module.app_gateway.public_ip_address]
-}
