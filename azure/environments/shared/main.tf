@@ -12,7 +12,7 @@ module "acr" {
   source              = "../../modules/acr"
   resource_group_name = module.resource_group.name
   location            = module.resource_group.location
-  acr_name            = "boutiqueacrshared"
+  acr_name            = "boutiqueacrshared9p2x4"
   tags = {
     purpose    = "non-prod"
     managed_by = "terraform"
@@ -26,7 +26,7 @@ module "acr_prod" {
   source              = "../../modules/acr"
   resource_group_name = module.resource_group.name
   location            = module.resource_group.location
-  acr_name            = "boutiqueacrprod"
+  acr_name            = "boutiqueacrprod9p2x4"
   sku                 = "Premium" # Premium required for geo-replication and private endpoints
   tags = {
     purpose    = "prod"

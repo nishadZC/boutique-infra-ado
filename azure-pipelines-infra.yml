@@ -83,19 +83,19 @@ stages:
                   set -e
                   echo "Promoting image tag: $(IMAGE_TAG)"
 
-                  SHARED_ACR="boutiqueacrshared.azurecr.io"
-                  PROD_ACR="boutiqueacrprod.azurecr.io"
+                  SHARED_ACR="boutiqueacrshared9p2x4.azurecr.io"
+                  PROD_ACR="boutiqueacrprod9p2x4.azurecr.io"
 
                   # Login to both registries
-                  az acr login --name boutiqueacrshared
-                  az acr login --name boutiqueacrprod
+                  az acr login --name boutiqueacrshared9p2x4
+                  az acr login --name boutiqueacrprod9p2x4
 
                   # Copy each service image from shared → prod ACR
                   # az acr import is atomic and doesn't require docker daemon
                   for SERVICE in backend frontend; do
                     echo "Promoting $SERVICE:$(IMAGE_TAG)"
                     az acr import \
-                      --name boutiqueacrprod \
+                      --name boutiqueacrprod9p2x4 \
                       --source $SHARED_ACR/$SERVICE:$(IMAGE_TAG) \
                       --image $SERVICE:$(IMAGE_TAG) \
                       --force

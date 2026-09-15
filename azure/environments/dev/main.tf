@@ -75,7 +75,7 @@ module "maps" {
 }
 
 data "azurerm_container_registry" "shared_acr" {
-  name                = "boutiqueacrshared"
+  name                = "boutiqueacrshared9p2x4"
   resource_group_name = "boutique-shared-rg"
 }
 

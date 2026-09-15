@@ -53,7 +53,7 @@ data "azurerm_client_config" "current" {}
 
 # Prod pulls images exclusively from the prod ACR (promoted via pipeline from shared ACR)
 data "azurerm_container_registry" "prod_acr" {
-  name                = "boutiqueacrprod"
+  name                = "boutiqueacrprod9p2x4"
   resource_group_name = "boutique-shared-rg"
 }
 

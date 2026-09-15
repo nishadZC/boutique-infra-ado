@@ -43,10 +43,10 @@ boutique-infra/
 
 | Registry             | SKU      | Used By              | CI Push? |
 |----------------------|----------|----------------------|----------|
-| `boutiqueacrshared`  | Standard | dev, qa, staging     | ✅ Yes   |
-| `boutiqueacrprod`    | Premium  | prod only            | ❌ Never |
+| `boutiqueacrshared9p2x4`  | Standard | dev, qa, staging     | ✅ Yes   |
+| `boutiqueacrprod9p2x4`    | Premium  | prod only            | ❌ Never |
 
-Images are **promoted** (not rebuilt) from `boutiqueacrshared` → `boutiqueacrprod` via `az acr import` after staging passes and a manual approval is granted.
+Images are **promoted** (not rebuilt) from `boutiqueacrshared9p2x4` → `boutiqueacrprod9p2x4` via `az acr import` after staging passes and a manual approval is granted.
 
 ## Pipeline Flow
 
@@ -93,7 +93,7 @@ The following secrets must be set in an Azure DevOps Variable Group linked to th
 - **SonarQube web access** restricted to known CIDRs via `TF_VAR_allowed_web_cidrs`
 - **Explicit deny-all NSG rule** on SonarQube at priority 4096
 - **Password authentication disabled** on SonarQube VM (`disable_password_authentication = true`)
-- **Prod AKS physically cannot pull** from non-prod ACR — RBAC grants AcrPull on `boutiqueacrprod` only
+- **Prod AKS physically cannot pull** from non-prod ACR — RBAC grants AcrPull on `boutiqueacrprod9p2x4` only
 - **Two manual approval gates** before any change reaches prod
 
 ## Running from Scratch
