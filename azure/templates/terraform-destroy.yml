@@ -122,7 +122,7 @@ stages:
                 git config --global user.name "Azure DevOps"
                 
                 rm -rf temp-gitops
-                git clone https://azdevops:$GITOPS_PAT@dev.azure.com/luxatelier/boutique-app/_git/boutique-gitops temp-gitops
+                git clone https://azdevops:$GITOPS_PAT@dev.azure.com/makkenamqmb/Boutique%20project/_git/boutique-gitops temp-gitops
                 cd temp-gitops
                 
                 sed -i "s|externalSecretsClientId: .*|externalSecretsClientId: \"\"|g" azure/system-apps/values-${{ parameters.environmentName }}.yaml

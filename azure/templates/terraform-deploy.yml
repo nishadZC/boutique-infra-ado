@@ -160,7 +160,7 @@ stages:
                       argocd.argoproj.io/secret-type: repository
                   stringData:
                     type: git
-                    url: https://dev.azure.com/luxatelier/boutique-app/_git/boutique-gitops
+                    url: https://dev.azure.com/makkenamqmb/Boutique%20project/_git/boutique-gitops
                     password: $GITOPS_PAT
                     username: azdevops
                   EOF
@@ -190,7 +190,7 @@ stages:
                   git config --global user.name "Azure DevOps"
                   
                   rm -rf temp-gitops
-                  git clone https://azdevops:$GITOPS_PAT@dev.azure.com/luxatelier/boutique-app/_git/boutique-gitops temp-gitops
+                  git clone https://azdevops:$GITOPS_PAT@dev.azure.com/makkenamqmb/Boutique%20project/_git/boutique-gitops temp-gitops
                   cd temp-gitops
                   
                   sed -i "s|externalSecretsClientId: .*|externalSecretsClientId: \"$CLIENT_ID\"|g" azure/system-apps/values-${{ parameters.environmentName }}.yaml
