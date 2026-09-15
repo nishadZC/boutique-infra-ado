@@ -11,7 +11,7 @@ variable "resource_group_name" {
 variable "sku_name" {
   description = "The SKU of the Azure Maps Account."
   type        = string
-  default     = "S0"
+  default     = "G2"
 }
 
 variable "tags" {
