@@ -48,6 +48,16 @@ variable "pagerduty_key" {
   sensitive = true
 }
 
+variable "grafana_admin_user" {
+  type    = string
+  default = "admin"
+}
+
+variable "grafana_admin_password" {
+  type      = string
+  sensitive = true
+}
+
 variable "cloudinary_cloud_name" {
   type      = string
   sensitive = true

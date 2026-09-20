@@ -73,6 +73,8 @@ stages:
         TF_VAR_azure_maps_subscription_key: $(TF_VAR_azure_maps_subscription_key)
         TF_VAR_razorpay_key_id: $(TF_VAR_razorpay_key_id)
         TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
+        TF_VAR_grafana_admin_user: $(TF_VAR_grafana_admin_user)
+        TF_VAR_grafana_admin_password: $(TF_VAR_grafana_admin_password)
     - task: PublishPipelineArtifact@1
       displayName: 'Publish Plan'
       inputs:
@@ -137,6 +139,8 @@ stages:
               TF_VAR_azure_maps_subscription_key: $(TF_VAR_azure_maps_subscription_key)
               TF_VAR_razorpay_key_id: $(TF_VAR_razorpay_key_id)
               TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
+              TF_VAR_grafana_admin_user: $(TF_VAR_grafana_admin_user)
+              TF_VAR_grafana_admin_password: $(TF_VAR_grafana_admin_password)
           - ${{ if ne(parameters.environmentName, 'shared') }}:
             - task: AzureCLI@2
               displayName: 'Install ArgoCD (${{ parameters.environmentName }})'

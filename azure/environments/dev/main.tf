@@ -152,5 +152,25 @@ resource "azurerm_key_vault_secret" "pagerduty_key" {
   ]
 }
 
+resource "azurerm_key_vault_secret" "grafana_admin_user" {
+  name         = "grafana-admin-user"
+  value        = var.grafana_admin_user
+  key_vault_id = module.keyvault.id
+  depends_on = [
+    azurerm_key_vault_access_policy.terraform_policy,
+    module.identity.app_identity_policy_id,
+  ]
+}
+
+resource "azurerm_key_vault_secret" "grafana_admin_password" {
+  name         = "grafana-admin-password"
+  value        = var.grafana_admin_password
+  key_vault_id = module.keyvault.id
+  depends_on = [
+    azurerm_key_vault_access_policy.terraform_policy,
+    module.identity.app_identity_policy_id,
+  ]
+}
+
 # Role assignments are now managed by the identity module
 
