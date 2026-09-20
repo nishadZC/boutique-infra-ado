@@ -54,6 +54,8 @@ stages:
         TF_VAR_azure_maps_subscription_key: $(TF_VAR_azure_maps_subscription_key)
         TF_VAR_razorpay_key_id: $(TF_VAR_razorpay_key_id)
         TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
+        TF_VAR_grafana_admin_user: $(TF_VAR_grafana_admin_user)
+        TF_VAR_grafana_admin_password: $(TF_VAR_grafana_admin_password)
 
 - stage: ApplyDestroy_${{ parameters.environmentName }}
   displayName: 'Apply Destroy ${{ parameters.environmentName }} Infrastructure'
@@ -105,6 +107,8 @@ stages:
               TF_VAR_azure_maps_subscription_key: $(TF_VAR_azure_maps_subscription_key)
               TF_VAR_razorpay_key_id: $(TF_VAR_razorpay_key_id)
               TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
+              TF_VAR_grafana_admin_user: $(TF_VAR_grafana_admin_user)
+              TF_VAR_grafana_admin_password: $(TF_VAR_grafana_admin_password)
           - task: AzureCLI@2
             displayName: 'GitOps Cleanup Handoff (${{ parameters.environmentName }})'
             condition: and(succeeded(), ne('${{ parameters.environmentName }}', 'shared'))
