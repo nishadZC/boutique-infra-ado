@@ -33,12 +33,3 @@ variable "postgres_subnet_prefix" {
   description = "Address prefix for the PostgreSQL subnet"
 }
 
-variable "bastion_subnet_prefix" {
-  type        = string
-  description = "Address prefix for the Azure Bastion subnet"
-}
-
-variable "bastion_name" {
-  type        = string
-  description = "Name of the Bastion Host"
-}

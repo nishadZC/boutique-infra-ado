@@ -22,8 +22,3 @@ output "postgres_subnet_id" {
   description = "The ID of the PostgreSQL Subnet"
   value       = azurerm_subnet.postgres.id
 }
-
-output "bastion_host_id" {
-  description = "The ID of the Bastion Host"
-  value       = azurerm_bastion_host.bastion.id
-}

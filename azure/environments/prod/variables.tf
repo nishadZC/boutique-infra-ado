@@ -39,10 +39,6 @@ variable "postgres_subnet_prefix" {
   type = string
 }
 
-variable "bastion_subnet_prefix" {
-  type = string
-}
-
 variable "pagerduty_key" {
   type      = string
   sensitive = true

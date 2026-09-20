@@ -13,8 +13,6 @@ module "network" {
   aks_subnet_prefix      = var.aks_subnet_prefix
   appgw_subnet_prefix    = var.appgw_subnet_prefix
   postgres_subnet_prefix = var.postgres_subnet_prefix
-  bastion_subnet_prefix  = var.bastion_subnet_prefix
-  bastion_name           = "${var.prefix}-bastion"
 }
 
 module "app_gateway" {
