@@ -99,6 +99,19 @@ The shared stage runs first. All other environments depend on its completion.
 ### Step 2 — Provision Environments Sequentially
 The pipeline automatically provisions dev → qa → staging. Prod requires two manual approvals.
 
+### Selective Runs
+When you only changed one environment's infra (e.g. `qa`), you don't need to re-run everything before it. Queue the pipeline manually and set the `run*` parameters to skip environments you haven't touched:
+
+| Parameter        | Controls                          |
+|-------------------|------------------------------------|
+| `runShared`       | Plan/Apply `shared`               |
+| `runDev`          | Plan/Apply `dev`                  |
+| `runQa`           | Plan/Apply `qa`                   |
+| `runStaging`      | Plan/Apply `staging`              |
+| `runProdRelease`  | Promote images + Plan/Apply `prod`|
+
+Each stage only depends on the previous one if that previous stage is included in the same run — e.g. set `runShared=false, runDev=false, runQa=true` to apply `qa` on its own against already-provisioned `shared`/`dev` state. All default to `true`, so an unattended run (or a PR validation build, which always uses the defaults) still plans/applies the full stack.
+
 ### Step 3 — GitOps Handoff
 After each environment's `Apply` stage, the pipeline automatically:
 1. Installs ArgoCD on the AKS cluster

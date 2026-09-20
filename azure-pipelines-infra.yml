@@ -14,6 +14,22 @@ parameters:
     displayName: "Run Shared Environment"
     type: boolean
     default: true
+  - name: runDev
+    displayName: "Run Dev Environment"
+    type: boolean
+    default: true
+  - name: runQa
+    displayName: "Run QA Environment"
+    type: boolean
+    default: true
+  - name: runStaging
+    displayName: "Run Staging Environment"
+    type: boolean
+    default: true
+  - name: runProdRelease
+    displayName: "Run Promote + Prod"
+    type: boolean
+    default: true
 
 variables:
   azureServiceConnection: 'Azure Resource Group'
@@ -33,98 +49,111 @@ stages:
   # ==========================================
   # DEV ENVIRONMENT
   # ==========================================
-  - template: azure/templates/terraform-deploy.yml
-    parameters:
-      environmentName: 'dev'
-      azureServiceConnection: $(azureServiceConnection)
-      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-        dependsOn: []
-      ${{ elseif eq(parameters.runShared, true) }}:
-        dependsOn: ['Apply_shared']
-      ${{ else }}:
-        dependsOn: []
+  - ${{ if eq(parameters.runDev, true) }}:
+    - template: azure/templates/terraform-deploy.yml
+      parameters:
+        environmentName: 'dev'
+        azureServiceConnection: $(azureServiceConnection)
+        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+          dependsOn: []
+        ${{ elseif eq(parameters.runShared, true) }}:
+          dependsOn: ['Apply_shared']
+        ${{ else }}:
+          dependsOn: []
 
   # ==========================================
   # QA ENVIRONMENT
   # ==========================================
-  - template: azure/templates/terraform-deploy.yml
-    parameters:
-      environmentName: 'qa'
-      azureServiceConnection: $(azureServiceConnection)
-      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-        dependsOn: []
-      ${{ else }}:
-        dependsOn: ['Apply_dev']
+  - ${{ if eq(parameters.runQa, true) }}:
+    - template: azure/templates/terraform-deploy.yml
+      parameters:
+        environmentName: 'qa'
+        azureServiceConnection: $(azureServiceConnection)
+        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+          dependsOn: []
+        ${{ elseif eq(parameters.runDev, true) }}:
+          dependsOn: ['Apply_dev']
+        ${{ else }}:
+          dependsOn: []
 
   # ==========================================
   # STAGING ENVIRONMENT
   # ==========================================
-  - template: azure/templates/terraform-deploy.yml
-    parameters:
-      environmentName: 'staging'
-      azureServiceConnection: $(azureServiceConnection)
-      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-        dependsOn: []
-      ${{ else }}:
-        dependsOn: ['Apply_qa']
+  - ${{ if eq(parameters.runStaging, true) }}:
+    - template: azure/templates/terraform-deploy.yml
+      parameters:
+        environmentName: 'staging'
+        azureServiceConnection: $(azureServiceConnection)
+        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+          dependsOn: []
+        ${{ elseif eq(parameters.runQa, true) }}:
+          dependsOn: ['Apply_qa']
+        ${{ else }}:
+          dependsOn: []
 
   # ==========================================
   # PROMOTE IMAGES: shared-acr → prod-acr
   # Runs after staging is verified and approved.
   # Copies only the validated image tags to the prod ACR.
   # Prod AKS has AcrPull on prod-acr only — it cannot pull from shared-acr.
+  # Gated behind runProdRelease so lower-env-only runs can skip it.
   # ==========================================
-  - stage: Promote_Images_To_Prod
-    displayName: 'Promote Images to Prod ACR'
-    dependsOn: ['Apply_staging']
-    condition: and(succeeded('Apply_staging'), ne(variables['Build.Reason'], 'PullRequest'))
-    jobs:
-    - deployment: PromoteImages
-      pool:
-        name: Default
-      environment: 'azure-prod-promote-environment' # Manual approval gate: confirms staging passed before images go to prod ACR
-      strategy:
-        runOnce:
-          deploy:
-            steps:
-            - task: AzureCLI@2
-              displayName: 'Copy images from shared-acr to prod-acr'
-              inputs:
-                azureSubscription: $(azureServiceConnection)
-                scriptType: 'bash'
-                scriptLocation: 'inlineScript'
-                inlineScript: |
-                  set -e
-                  echo "Promoting image tag: $(IMAGE_TAG)"
-
-                  SHARED_ACR="boutiqueacrshared9p2x4.azurecr.io"
-                  PROD_ACR="boutiqueacrprod9p2x4.azurecr.io"
-
-                  # Login to both registries
-                  az acr login --name boutiqueacrshared9p2x4
-                  az acr login --name boutiqueacrprod9p2x4
-
-                  # Copy each service image from shared → prod ACR
-                  # az acr import is atomic and doesn't require docker daemon
-                  for SERVICE in backend frontend; do
-                    echo "Promoting $SERVICE:$(IMAGE_TAG)"
-                    az acr import \
-                      --name boutiqueacrprod9p2x4 \
-                      --source $SHARED_ACR/$SERVICE:$(IMAGE_TAG) \
-                      --image $SERVICE:$(IMAGE_TAG) \
-                      --force
-                  done
-
-                  echo "Promotion complete. Prod ACR now has image tag: $(IMAGE_TAG)"
-
-  # ==========================================
-  # PROD ENVIRONMENT
-  # ==========================================
-  - template: azure/templates/terraform-deploy.yml
-    parameters:
-      environmentName: 'prod'
-      azureServiceConnection: $(azureServiceConnection)
-      ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-        dependsOn: []
+  - ${{ if eq(parameters.runProdRelease, true) }}:
+    - stage: Promote_Images_To_Prod
+      displayName: 'Promote Images to Prod ACR'
+      ${{ if eq(parameters.runStaging, true) }}:
+        dependsOn: ['Apply_staging']
+        condition: and(succeeded('Apply_staging'), ne(variables['Build.Reason'], 'PullRequest'))
       ${{ else }}:
-        dependsOn: ['Promote_Images_To_Prod']
+        dependsOn: []
+        condition: ne(variables['Build.Reason'], 'PullRequest')
+      jobs:
+      - deployment: PromoteImages
+        pool:
+          name: Default
+        environment: 'azure-prod-promote-environment' # Manual approval gate: confirms staging passed before images go to prod ACR
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+              - task: AzureCLI@2
+                displayName: 'Copy images from shared-acr to prod-acr'
+                inputs:
+                  azureSubscription: $(azureServiceConnection)
+                  scriptType: 'bash'
+                  scriptLocation: 'inlineScript'
+                  inlineScript: |
+                    set -e
+                    echo "Promoting image tag: $(IMAGE_TAG)"
+
+                    SHARED_ACR="boutiqueacrshared9p2x4.azurecr.io"
+                    PROD_ACR="boutiqueacrprod9p2x4.azurecr.io"
+
+                    # Login to both registries
+                    az acr login --name boutiqueacrshared9p2x4
+                    az acr login --name boutiqueacrprod9p2x4
+
+                    # Copy each service image from shared → prod ACR
+                    # az acr import is atomic and doesn't require docker daemon
+                    for SERVICE in backend frontend; do
+                      echo "Promoting $SERVICE:$(IMAGE_TAG)"
+                      az acr import \
+                        --name boutiqueacrprod9p2x4 \
+                        --source $SHARED_ACR/$SERVICE:$(IMAGE_TAG) \
+                        --image $SERVICE:$(IMAGE_TAG) \
+                        --force
+                    done
+
+                    echo "Promotion complete. Prod ACR now has image tag: $(IMAGE_TAG)"
+
+    # ==========================================
+    # PROD ENVIRONMENT
+    # ==========================================
+    - template: azure/templates/terraform-deploy.yml
+      parameters:
+        environmentName: 'prod'
+        azureServiceConnection: $(azureServiceConnection)
+        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+          dependsOn: []
+        ${{ else }}:
+          dependsOn: ['Promote_Images_To_Prod']
