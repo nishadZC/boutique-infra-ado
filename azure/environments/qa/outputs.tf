@@ -22,6 +22,11 @@ output "app_gateway_public_ip" {
   value = module.app_gateway.public_ip_address
 }
 
+output "app_gateway_fqdn" {
+  value       = module.app_gateway.fqdn
+  description = "Free Azure-provided hostname (*.cloudapp.azure.com) for this environment's public IP - use this instead of the raw IP until a real domain is set up."
+}
+
 output "app_identity_client_id" {
   value = module.identity.app_identity_client_id
 }
