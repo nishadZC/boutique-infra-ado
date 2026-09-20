@@ -6,7 +6,7 @@
 boutique-infra/
 ├── azure/
 │   ├── environments/
-│   │   ├── shared/      # ACR (non-prod + prod), SonarQube — provisioned FIRST
+│   │   ├── shared/      # ACR (non-prod + prod) — provisioned FIRST
 │   │   ├── dev/         # Development environment
 │   │   ├── qa/          # QA environment
 │   │   ├── staging/     # Staging / UAT environment
@@ -19,8 +19,7 @@ boutique-infra/
 │   │   ├── app_gateway/      # Application Gateway (AGIC)
 │   │   ├── keyvault/         # Key Vault
 │   │   ├── network/          # VNet, subnets, NSGs, Bastion
-│   │   ├── postgres/         # PostgreSQL Flexible Server
-│   │   └── sonarqube/        # SonarQube VM (SSH via Bastion only)
+│   │   └── postgres/         # PostgreSQL Flexible Server
 │   └── templates/
 │       ├── terraform-deploy.yml   # Reusable plan + apply template
 │       └── terraform-destroy.yml  # Reusable destroy template
@@ -73,7 +72,7 @@ The following secrets must be set in an Azure DevOps Variable Group linked to th
 |----------------------------------|------------------------------------------------|--------|
 | `TF_VAR_db_password`             | PostgreSQL admin password                      | ✅     |
 | `TF_VAR_pagerduty_key`           | PagerDuty integration key                      | ✅     |
-| `TF_VAR_ssh_public_key`          | SSH public key for SonarQube VM                | ✅     |
+| `TF_VAR_ssh_public_key`          | SSH public key for AKS nodes                   | ✅     |
 | `TF_VAR_cloudinary_cloud_name`   | Cloudinary cloud name                          | ✅     |
 | `TF_VAR_cloudinary_api_key`      | Cloudinary API key                             | ✅     |
 | `TF_VAR_cloudinary_api_secret`   | Cloudinary API secret                          | ✅     |
@@ -81,8 +80,6 @@ The following secrets must be set in an Azure DevOps Variable Group linked to th
 | `TF_VAR_azure_maps_subscription_key` | Azure Maps key                            | ✅     |
 | `TF_VAR_razorpay_key_id`         | Razorpay key ID                                | ✅     |
 | `TF_VAR_razorpay_key_secret`     | Razorpay key secret                            | ✅     |
-| `TF_VAR_allowed_web_cidrs`       | CIDRs allowed to access SonarQube port 9000    | ❌     |
-| `TF_VAR_allowed_ssh_cidrs`       | Direct SSH CIDRs (leave empty, use Bastion)    | ❌     |
 | `GITOPS_PAT`                     | Azure DevOps PAT for boutique-gitops repo      | ✅     |
 | `IMAGE_TAG`                      | Git commit SHA of the image to promote to prod | ❌     |
 
@@ -90,15 +87,12 @@ The following secrets must be set in an Azure DevOps Variable Group linked to th
 
 - **ACR admin disabled** — all access via RBAC (AcrPull/AcrPush) with Managed Identities
 - **No SSH port 22 open publicly** — use Azure Bastion (already provisioned in every environment's VNet)
-- **SonarQube web access** restricted to known CIDRs via `TF_VAR_allowed_web_cidrs`
-- **Explicit deny-all NSG rule** on SonarQube at priority 4096
-- **Password authentication disabled** on SonarQube VM (`disable_password_authentication = true`)
 - **Prod AKS physically cannot pull** from non-prod ACR — RBAC grants AcrPull on `boutiqueacrprod9p2x4` only
 - **Two manual approval gates** before any change reaches prod
 
 ## Running from Scratch
 
-### Step 1 — Provision Shared Resources (ACR + SonarQube)
+### Step 1 — Provision Shared Resources (ACR)
 Run the **Boutique Infrastructure Pipeline** with `runShared = true`.
 The shared stage runs first. All other environments depend on its completion.
 

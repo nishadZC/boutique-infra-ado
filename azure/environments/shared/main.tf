@@ -4,8 +4,6 @@ module "resource_group" {
   location = var.location
 }
 
-
-
 # Non-prod ACR: used by dev, qa, staging
 # CI pipeline builds and pushes images here
 module "acr" {
@@ -34,28 +32,3 @@ module "acr_prod" {
   }
 }
 
-resource "azurerm_virtual_network" "shared" {
-  name                = "${var.prefix}-vnet"
-  address_space       = var.vnet_address_space
-  location            = module.resource_group.location
-  resource_group_name = module.resource_group.name
-}
-
-resource "azurerm_subnet" "sonarqube" {
-  name                 = "sonarqube-subnet"
-  resource_group_name  = module.resource_group.name
-  virtual_network_name = azurerm_virtual_network.shared.name
-  address_prefixes     = [var.sonarqube_subnet_prefix]
-}
-
-module "sonarqube" {
-  source              = "../../modules/sonarqube"
-  resource_group_name = module.resource_group.name
-  location            = module.resource_group.location
-  vm_name             = "${var.prefix}-sonarqube"
-  subnet_id           = azurerm_subnet.sonarqube.id
-  admin_username      = var.admin_username
-  ssh_public_key      = var.ssh_public_key
-  allowed_ssh_cidrs   = var.allowed_ssh_cidrs
-  allowed_web_cidrs   = var.allowed_web_cidrs
-}

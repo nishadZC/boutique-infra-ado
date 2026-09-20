@@ -1,10 +1,13 @@
 trigger: none
 
+parameters:
+  - name: runProdDestroy
+    displayName: "Destroy Prod (danger)"
+    type: boolean
+    default: false
+
 variables:
   azureServiceConnection: 'Azure Resource Group'
-  tfstateResourceGroup: 'tfstate-rg'
-  tfstateStorageAccount: 'boutiquetfstate2026v2'
-  tfstateContainer: 'tfstate'
 
 stages:
   # ==========================================
@@ -32,12 +35,15 @@ stages:
       azureServiceConnection: $(azureServiceConnection)
 
   # ==========================================
-  # PROD ENVIRONMENT DESTROY (Commented out for now)
+  # PROD ENVIRONMENT DESTROY
+  # Disabled by default — requires explicitly setting runProdDestroy=true
+  # at queue time, in addition to the environment approval gate.
   # ==========================================
-  # - template: azure/templates/terraform-destroy.yml
-  #   parameters:
-  #     environmentName: 'prod'
-  #     azureServiceConnection: $(azureServiceConnection)
+  - ${{ if eq(parameters.runProdDestroy, true) }}:
+    - template: azure/templates/terraform-destroy.yml
+      parameters:
+        environmentName: 'prod'
+        azureServiceConnection: $(azureServiceConnection)
 
   # ==========================================
   # SHARED ENVIRONMENT DESTROY

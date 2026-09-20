@@ -29,6 +29,16 @@ stages:
           terraform version
           echo "Terraform is ready on self-hosted agent."
 
+    - task: Bash@3
+      displayName: 'IaC Security Scan (Trivy Config)'
+      inputs:
+        targetType: 'inline'
+        script: |
+          docker run --rm -v $(System.DefaultWorkingDirectory):/src aquasec/trivy:latest config \
+            --severity CRITICAL,HIGH \
+            --exit-code 0 \
+            /src/azure/environments/${{ parameters.environmentName }}
+
     - task: AzureCLI@2
       displayName: 'Terraform Plan (${{ parameters.environmentName }})'
       inputs:
@@ -43,15 +53,13 @@ stages:
           export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
 
           cd azure/environments/${{ parameters.environmentName }}
-          
+
           terraform fmt -check || echo "Formatting issues found, but continuing..."
           terraform init
-          terraform state rm helm_release.argocd 2>/dev/null || true
           terraform validate
-          
-          # Force a state refresh to catch any out-of-band deletions (like missing VNets)
-          terraform apply -refresh-only -auto-approve -var-file="${{ parameters.environmentName }}.tfvars" || echo "Refresh failed, continuing to plan..."
-          
+
+          # `plan` refreshes state in-memory to detect drift; unlike `apply -refresh-only`
+          # it never persists changes to the backend, so this stays safe to run pre-approval.
           terraform plan -var-file="${{ parameters.environmentName }}.tfvars" -out=$(Build.ArtifactStagingDirectory)/${{ parameters.environmentName }}-tfplan
         addSpnToEnvironment: true
       env:
@@ -75,7 +83,7 @@ stages:
 - stage: Apply_${{ parameters.environmentName }}
   displayName: 'Apply ${{ parameters.environmentName }} Infrastructure'
   dependsOn: Plan_${{ parameters.environmentName }}
-  condition: succeeded('Plan_${{ parameters.environmentName }}')
+  condition: and(succeeded('Plan_${{ parameters.environmentName }}'), ne(variables['Build.Reason'], 'PullRequest'))
   jobs:
   - deployment: TerraformApply
     pool:

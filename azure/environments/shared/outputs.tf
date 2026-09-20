@@ -17,8 +17,3 @@ output "acr_prod_id" {
   value       = module.acr_prod.id
   description = "Prod ACR resource ID. Used to grant AcrPull to prod AKS cluster only."
 }
-
-output "sonarqube_public_ip" {
-  value       = module.sonarqube.public_ip
-  description = "Public IP of the SonarQube VM. Access on port 9000."
-}
