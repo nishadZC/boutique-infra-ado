@@ -1,8 +1,18 @@
 trigger: none
 
 parameters:
-  - name: runProdDestroy
-    displayName: "Destroy Prod (danger)"
+  - name: environmentName
+    displayName: "Environment to Destroy"
+    type: string
+    default: 'dev'
+    values:
+      - dev
+      - qa
+      - staging
+      - shared
+      - prod
+  - name: confirmProdDestroy
+    displayName: "Confirm Prod Destroy (danger — required if Environment is 'prod')"
     type: boolean
     default: false
 
@@ -11,45 +21,25 @@ variables:
 
 stages:
   # ==========================================
-  # DEV ENVIRONMENT DESTROY
+  # SAFETY GUARD: block prod unless explicitly confirmed
   # ==========================================
-  - template: azure/templates/terraform-destroy.yml
-    parameters:
-      environmentName: 'dev'
-      azureServiceConnection: $(azureServiceConnection)
+  - ${{ if and(eq(parameters.environmentName, 'prod'), ne(parameters.confirmProdDestroy, true)) }}:
+    - stage: BlockedProdDestroy
+      displayName: 'Blocked: Prod Destroy Not Confirmed'
+      jobs:
+      - job: Blocked
+        pool:
+          name: Default
+        steps:
+        - script: |
+            echo "##vso[task.logissue type=error]Environment 'prod' selected but 'confirmProdDestroy' was not checked. Re-run with confirmProdDestroy=true to destroy prod."
+            exit 1
 
   # ==========================================
-  # QA ENVIRONMENT DESTROY
+  # DESTROY SELECTED ENVIRONMENT
   # ==========================================
-  - template: azure/templates/terraform-destroy.yml
-    parameters:
-      environmentName: 'qa'
-      azureServiceConnection: $(azureServiceConnection)
-
-  # ==========================================
-  # STAGING ENVIRONMENT DESTROY
-  # ==========================================
-  - template: azure/templates/terraform-destroy.yml
-    parameters:
-      environmentName: 'staging'
-      azureServiceConnection: $(azureServiceConnection)
-
-  # ==========================================
-  # PROD ENVIRONMENT DESTROY
-  # Disabled by default — requires explicitly setting runProdDestroy=true
-  # at queue time, in addition to the environment approval gate.
-  # ==========================================
-  - ${{ if eq(parameters.runProdDestroy, true) }}:
+  - ${{ if not(and(eq(parameters.environmentName, 'prod'), ne(parameters.confirmProdDestroy, true))) }}:
     - template: azure/templates/terraform-destroy.yml
       parameters:
-        environmentName: 'prod'
+        environmentName: '${{ parameters.environmentName }}'
         azureServiceConnection: $(azureServiceConnection)
-
-  # ==========================================
-  # SHARED ENVIRONMENT DESTROY
-  # ==========================================
-  - template: azure/templates/terraform-destroy.yml
-    parameters:
-      environmentName: 'shared'
-      azureServiceConnection: $(azureServiceConnection)
-      dependsOn: ['ApplyDestroy_dev', 'ApplyDestroy_qa', 'ApplyDestroy_staging']
