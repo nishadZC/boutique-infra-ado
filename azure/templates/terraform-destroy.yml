@@ -59,6 +59,7 @@ stages:
         TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
         TF_VAR_grafana_admin_user: $(TF_VAR_grafana_admin_user)
         TF_VAR_grafana_admin_password: $(TF_VAR_grafana_admin_password)
+        TF_VAR_jwt_secret: $(TF_VAR_jwt_secret)
 
 - stage: ApplyDestroy_${{ parameters.environmentName }}
   displayName: 'Apply Destroy ${{ parameters.environmentName }} Infrastructure'
@@ -113,6 +114,7 @@ stages:
               TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
               TF_VAR_grafana_admin_user: $(TF_VAR_grafana_admin_user)
               TF_VAR_grafana_admin_password: $(TF_VAR_grafana_admin_password)
+              TF_VAR_jwt_secret: $(TF_VAR_jwt_secret)
           - task: AzureCLI@2
             displayName: 'GitOps Cleanup Handoff (${{ parameters.environmentName }})'
             condition: and(succeeded(), ne('${{ parameters.environmentName }}', 'shared'))

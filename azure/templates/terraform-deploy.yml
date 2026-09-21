@@ -78,6 +78,7 @@ stages:
         TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
         TF_VAR_grafana_admin_user: $(TF_VAR_grafana_admin_user)
         TF_VAR_grafana_admin_password: $(TF_VAR_grafana_admin_password)
+        TF_VAR_jwt_secret: $(TF_VAR_jwt_secret)
     - task: PublishPipelineArtifact@1
       displayName: 'Publish Plan'
       inputs:
@@ -145,6 +146,7 @@ stages:
               TF_VAR_razorpay_key_secret: $(TF_VAR_razorpay_key_secret)
               TF_VAR_grafana_admin_user: $(TF_VAR_grafana_admin_user)
               TF_VAR_grafana_admin_password: $(TF_VAR_grafana_admin_password)
+              TF_VAR_jwt_secret: $(TF_VAR_jwt_secret)
           - ${{ if ne(parameters.environmentName, 'shared') }}:
             - task: AzureCLI@2
               displayName: 'Install ArgoCD (${{ parameters.environmentName }})'

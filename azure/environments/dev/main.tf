@@ -138,6 +138,7 @@ resource "azurerm_key_vault_secret" "db_secret" {
     AZURE_MAPS_SUBSCRIPTION_KEY = module.maps.primary_access_key
     RAZORPAY_KEY_ID             = var.razorpay_key_id
     RAZORPAY_KEY_SECRET         = var.razorpay_key_secret
+    JWT_SECRET                  = var.jwt_secret
   })
   key_vault_id = module.keyvault.id
   depends_on = [
