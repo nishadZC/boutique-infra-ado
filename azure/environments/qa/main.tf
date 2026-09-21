@@ -72,7 +72,7 @@ module "acr" {
   source              = "../../modules/acr"
   resource_group_name = module.resource_group.name
   location            = module.resource_group.location
-  acr_name            = "boutiqueacrqa9p2x4"
+  acr_name            = var.acr_name
   tags = {
     purpose    = "qa"
     managed_by = "terraform"

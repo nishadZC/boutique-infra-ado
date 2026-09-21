@@ -10,6 +10,8 @@ parameters:
   - name: planCondition
     type: string
     default: 'succeeded()'
+  - name: acrName
+    type: string
 
 stages:
 - stage: Plan_${{ parameters.environmentName }}
@@ -63,6 +65,7 @@ stages:
           terraform plan -var-file="${{ parameters.environmentName }}.tfvars" -out=$(Build.ArtifactStagingDirectory)/${{ parameters.environmentName }}-tfplan
         addSpnToEnvironment: true
       env:
+        TF_VAR_acr_name: ${{ parameters.acrName }}
         TF_VAR_db_password: $(TF_VAR_db_password)
         TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
         TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)
@@ -129,6 +132,7 @@ stages:
                 terraform apply -auto-approve $(Build.ArtifactStagingDirectory)/${{ parameters.environmentName }}-tfplan
               addSpnToEnvironment: true
             env:
+              TF_VAR_acr_name: ${{ parameters.acrName }}
               TF_VAR_db_password: $(TF_VAR_db_password)
               TF_VAR_pagerduty_key: $(TF_VAR_pagerduty_key)
               TF_VAR_ssh_public_key: $(TF_VAR_ssh_public_key)

@@ -89,3 +89,8 @@ variable "ssh_public_key" {
   type        = string
   description = "SSH public key for AKS nodes"
 }
+
+variable "acr_name" {
+  type        = string
+  description = "Name of this environment's Azure Container Registry (must be globally unique)"
+}

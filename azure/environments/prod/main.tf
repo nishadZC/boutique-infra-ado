@@ -55,7 +55,7 @@ module "acr" {
   source              = "../../modules/acr"
   resource_group_name = module.resource_group.name
   location            = module.resource_group.location
-  acr_name            = "boutiqueacrprod9p2x4"
+  acr_name            = var.acr_name
   sku                 = "Premium" # Premium required for geo-replication and private endpoints
   tags = {
     purpose    = "prod"
