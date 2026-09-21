@@ -10,10 +10,6 @@ pr:
       - azure/templates/**
 
 parameters:
-  - name: runShared
-    displayName: "Run Shared Environment"
-    type: boolean
-    default: true
   - name: runDev
     displayName: "Run Dev Environment"
     type: boolean
@@ -32,19 +28,11 @@ parameters:
     default: true
 
 variables:
-  azureServiceConnection: 'Azure Resource Group'
+  - group: acr-registries
+  - name: azureServiceConnection
+    value: 'Azure Resource Group'
 
 stages:
-
-  # ==========================================
-  # SHARED ENVIRONMENT
-  # (Contains ACR - required by other envs)
-  # ==========================================
-  - ${{ if eq(parameters.runShared, true) }}:
-    - template: azure/templates/terraform-deploy.yml
-      parameters:
-        environmentName: 'shared'
-        azureServiceConnection: $(azureServiceConnection)
 
   # ==========================================
   # DEV ENVIRONMENT
@@ -54,12 +42,7 @@ stages:
       parameters:
         environmentName: 'dev'
         azureServiceConnection: $(azureServiceConnection)
-        ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
-          dependsOn: []
-        ${{ elseif eq(parameters.runShared, true) }}:
-          dependsOn: ['Apply_shared']
-        ${{ else }}:
-          dependsOn: []
+        dependsOn: []
 
   # ==========================================
   # QA ENVIRONMENT
@@ -92,10 +75,10 @@ stages:
           dependsOn: []
 
   # ==========================================
-  # PROMOTE IMAGES: shared-acr → prod-acr
+  # PROMOTE IMAGES: staging-acr → prod-acr
   # Runs after staging is verified and approved.
   # Copies only the validated image tags to the prod ACR.
-  # Prod AKS has AcrPull on prod-acr only — it cannot pull from shared-acr.
+  # Prod AKS has AcrPull on prod-acr only — it cannot pull from staging-acr.
   # Gated behind runProdRelease so lower-env-only runs can skip it.
   # ==========================================
   - ${{ if eq(parameters.runProdRelease, true) }}:
@@ -117,7 +100,7 @@ stages:
             deploy:
               steps:
               - task: AzureCLI@2
-                displayName: 'Copy images from shared-acr to prod-acr'
+                displayName: 'Copy images from staging-acr to prod-acr'
                 inputs:
                   azureSubscription: $(azureServiceConnection)
                   scriptType: 'bash'
@@ -126,20 +109,20 @@ stages:
                     set -e
                     echo "Promoting image tag: $(IMAGE_TAG)"
 
-                    SHARED_ACR="boutiqueacrshared9p2x4.azurecr.io"
-                    PROD_ACR="boutiqueacrprod9p2x4.azurecr.io"
+                    STAGING_ACR="$(stagingAcr).azurecr.io"
+                    PROD_ACR="$(prodAcr).azurecr.io"
 
                     # Login to both registries
-                    az acr login --name boutiqueacrshared9p2x4
-                    az acr login --name boutiqueacrprod9p2x4
+                    az acr login --name $(stagingAcr)
+                    az acr login --name $(prodAcr)
 
-                    # Copy each service image from shared → prod ACR
+                    # Copy each service image from staging (last validated env) → prod ACR
                     # az acr import is atomic and doesn't require docker daemon
                     for SERVICE in backend frontend; do
                       echo "Promoting $SERVICE:$(IMAGE_TAG)"
                       az acr import \
-                        --name boutiqueacrprod9p2x4 \
-                        --source $SHARED_ACR/$SERVICE:$(IMAGE_TAG) \
+                        --name $(prodAcr) \
+                        --source $STAGING_ACR/$SERVICE:$(IMAGE_TAG) \
                         --image $SERVICE:$(IMAGE_TAG) \
                         --force
                     done

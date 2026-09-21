@@ -50,10 +50,17 @@ module "postgres" {
 
 data "azurerm_client_config" "current" {}
 
-# Prod pulls images exclusively from the prod ACR (promoted via pipeline from shared ACR)
-data "azurerm_container_registry" "prod_acr" {
-  name                = "boutiqueacrprod9p2x4"
-  resource_group_name = "boutique-shared-rg"
+# Prod pulls images exclusively from its own ACR (promoted via pipeline from staging's ACR)
+module "acr" {
+  source              = "../../modules/acr"
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  acr_name            = "boutiqueacrprod9p2x4"
+  sku                 = "Premium" # Premium required for geo-replication and private endpoints
+  tags = {
+    purpose    = "prod"
+    managed_by = "terraform"
+  }
 }
 
 resource "random_string" "kv_suffix" {
@@ -83,7 +90,7 @@ module "identity" {
   app_gateway_id                       = module.app_gateway.id
   appgw_subnet_id                      = module.network.appgw_subnet_id
   resource_group_id                    = module.resource_group.id
-  prod_acr_id                          = data.azurerm_container_registry.prod_acr.id
+  prod_acr_id                          = module.acr.id
   ingress_application_gateway_identity = module.aks.ingress_application_gateway_identity
   kubelet_identity_object_id           = module.aks.kubelet_identity_object_id
 }

@@ -68,9 +68,15 @@ module "keyvault" {
 }
 
 
-data "azurerm_container_registry" "shared_acr" {
-  name                = "boutiqueacrshared9p2x4"
-  resource_group_name = "boutique-shared-rg"
+module "acr" {
+  source              = "../../modules/acr"
+  resource_group_name = module.resource_group.name
+  location            = module.resource_group.location
+  acr_name            = "boutiqueacrqa9p2x4"
+  tags = {
+    purpose    = "qa"
+    managed_by = "terraform"
+  }
 }
 
 module "identity" {
@@ -84,7 +90,7 @@ module "identity" {
   app_gateway_id                       = module.app_gateway.id
   appgw_subnet_id                      = module.network.appgw_subnet_id
   resource_group_id                    = module.resource_group.id
-  shared_acr_id                        = data.azurerm_container_registry.shared_acr.id
+  shared_acr_id                        = module.acr.id
   ingress_application_gateway_identity = module.aks.ingress_application_gateway_identity
   kubelet_identity_object_id           = module.aks.kubelet_identity_object_id
 }
