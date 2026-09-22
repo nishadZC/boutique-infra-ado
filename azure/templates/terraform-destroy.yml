@@ -17,7 +17,7 @@ stages:
   jobs:
   - job: TerraformPlanDestroy
     pool:
-      name: Default
+      vmImage: 'ubuntu-latest'
     steps:
     - checkout: self
     - task: Bash@3
@@ -68,7 +68,7 @@ stages:
   jobs:
   - deployment: TerraformApplyDestroy
     pool:
-      name: Default
+      vmImage: 'ubuntu-latest'
     environment: 'azure-${{ parameters.environmentName }}-environment' # Triggers manual approvals in DevOps
     strategy:
       runOnce:

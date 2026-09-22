@@ -21,7 +21,7 @@ stages:
   jobs:
   - job: TerraformPlan
     pool:
-      name: Default
+      vmImage: 'ubuntu-latest'
     steps:
     - task: Bash@3
       displayName: 'Verify Terraform (pre-installed on agent)'
@@ -93,7 +93,7 @@ stages:
   jobs:
   - deployment: TerraformApply
     pool:
-      name: Default
+      vmImage: 'ubuntu-latest'
     environment: 'azure-${{ parameters.environmentName }}-environment' # Allows manual approvals in DevOps
     strategy:
       runOnce:
