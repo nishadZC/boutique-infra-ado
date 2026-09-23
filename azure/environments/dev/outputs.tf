@@ -38,3 +38,9 @@ output "cert_manager_client_id" {
 output "keyvault_uri" {
   value = module.keyvault.vault_uri
 }
+
+output "azure_maps_primary_access_key" {
+  value       = module.maps.primary_access_key
+  sensitive   = true
+  description = "Primary subscription key for the dev-only Terraform-managed Azure Maps account."
+}
