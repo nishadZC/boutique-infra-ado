@@ -113,7 +113,7 @@ stages:
               TF_VAR_jwt_secret: $(TF_VAR_jwt_secret)
           - task: AzureCLI@2
             displayName: 'GitOps Cleanup Handoff (${{ parameters.environmentName }})'
-            condition: and(succeeded(), ne('${{ parameters.environmentName }}', 'shared'))
+            condition: succeeded()
             env:
               GITOPS_PAT: $(GITOPS_PAT)
             inputs:
