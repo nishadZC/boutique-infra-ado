@@ -37,15 +37,13 @@ stages:
         backendAzureRmContainerName: 'tfstate'
         backendAzureRmKey: '${{ parameters.tfstateKey }}'
 
-    - task: Bash@3
+    - task: trivy@1
       displayName: 'IaC Security Scan (Trivy Config)'
       inputs:
-        targetType: 'inline'
-        script: |
-          docker run --rm -v $(System.DefaultWorkingDirectory):/src aquasec/trivy:latest config \
-            --severity CRITICAL,HIGH \
-            --exit-code 0 \
-            /src/azure/environments/${{ parameters.environmentName }}
+        path: 'azure/environments/${{ parameters.environmentName }}'
+        scanners: 'misconfig'
+        severities: 'CRITICAL,HIGH'
+        exitCode: '0'
 
     - task: AzureCLI@2
       displayName: 'Terraform Plan (${{ parameters.environmentName }})'
