@@ -23,17 +23,10 @@ stages:
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-    - task: Bash@3
+    - task: TerraformInstaller@1
       displayName: 'Install Terraform'
       inputs:
-        targetType: 'inline'
-        script: |
-          set -e
-          TF_VERSION=1.7.5
-          curl -fsSL "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
-          unzip -o terraform.zip -d /usr/local/bin
-          rm terraform.zip
-          terraform version
+        terraformVersion: '1.7.5'
 
     - task: Bash@3
       displayName: 'IaC Security Scan (Trivy Config)'
@@ -104,17 +97,10 @@ stages:
         deploy:
           steps:
           - checkout: self
-          - task: Bash@3
+          - task: TerraformInstaller@1
             displayName: 'Install Terraform'
             inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                TF_VERSION=1.7.5
-                curl -fsSL "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip" -o terraform.zip
-                unzip -o terraform.zip -d /usr/local/bin
-                rm terraform.zip
-                terraform version
+              terraformVersion: '1.7.5'
 
           - task: DownloadPipelineArtifact@2
             displayName: 'Download Plan'
