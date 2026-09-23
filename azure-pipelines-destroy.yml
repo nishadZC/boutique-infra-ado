@@ -33,7 +33,6 @@ stages:
         environmentName: 'dev'
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(devAcr)
-        tfstateKey: 'dev2.terraform.tfstate'
 
   # ==========================================
   # QA ENVIRONMENT DESTROY
@@ -44,7 +43,6 @@ stages:
         environmentName: 'qa'
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(qaAcr)
-        tfstateKey: 'qa.terraform.tfstate'
 
   # ==========================================
   # STAGING ENVIRONMENT DESTROY
@@ -55,7 +53,6 @@ stages:
         environmentName: 'staging'
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(stagingAcr)
-        tfstateKey: 'staging.terraform.tfstate'
 
   # ==========================================
   # PROD ENVIRONMENT DESTROY
@@ -68,4 +65,3 @@ stages:
         environmentName: 'prod'
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(prodAcr)
-        tfstateKey: 'prod.terraform.tfstate'

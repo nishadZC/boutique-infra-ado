@@ -43,7 +43,6 @@ stages:
         environmentName: 'dev'
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(devAcr)
-        tfstateKey: 'dev2.terraform.tfstate'
         dependsOn: []
 
   # ==========================================
@@ -55,7 +54,6 @@ stages:
         environmentName: 'qa'
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(qaAcr)
-        tfstateKey: 'qa.terraform.tfstate'
         ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
           dependsOn: []
         ${{ elseif eq(parameters.runDev, true) }}:
@@ -72,7 +70,6 @@ stages:
         environmentName: 'staging'
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(stagingAcr)
-        tfstateKey: 'staging.terraform.tfstate'
         ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
           dependsOn: []
         ${{ elseif eq(parameters.runQa, true) }}:
@@ -143,7 +140,6 @@ stages:
         environmentName: 'prod'
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(prodAcr)
-        tfstateKey: 'prod.terraform.tfstate'
         ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
           dependsOn: []
         ${{ else }}:

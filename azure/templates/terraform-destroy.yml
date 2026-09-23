@@ -9,8 +9,6 @@ parameters:
     default: []
   - name: acrName
     type: string
-  - name: tfstateKey
-    type: string
 
 stages:
 - stage: PlanDestroy_${{ parameters.environmentName }}
@@ -26,18 +24,6 @@ stages:
       displayName: 'Install Terraform CLI'
       inputs:
         terraformVersion: '1.7.5'
-
-    - task: TerraformTask@5
-      displayName: 'Init Terraform'
-      inputs:
-        provider: 'azurerm'
-        command: 'init'
-        workingDirectory: '$(System.DefaultWorkingDirectory)/azure/environments/${{ parameters.environmentName }}'
-        backendServiceArm: '${{ parameters.azureServiceConnection }}'
-        backendAzureRmResourceGroupName: 'tfstate-rg'
-        backendAzureRmStorageAccountName: 'boutiquetfstate2026v2'
-        backendAzureRmContainerName: 'tfstate'
-        backendAzureRmKey: '${{ parameters.tfstateKey }}'
 
     - task: AzureCLI@2
       displayName: 'Terraform Plan Destroy (${{ parameters.environmentName }})'
@@ -90,18 +76,6 @@ stages:
             displayName: 'Install Terraform CLI'
             inputs:
               terraformVersion: '1.7.5'
-
-          - task: TerraformTask@5
-            displayName: 'Init Terraform'
-            inputs:
-              provider: 'azurerm'
-              command: 'init'
-              workingDirectory: '$(System.DefaultWorkingDirectory)/azure/environments/${{ parameters.environmentName }}'
-              backendServiceArm: '${{ parameters.azureServiceConnection }}'
-              backendAzureRmResourceGroupName: 'tfstate-rg'
-              backendAzureRmStorageAccountName: 'boutiquetfstate2026v2'
-              backendAzureRmContainerName: 'tfstate'
-              backendAzureRmKey: '${{ parameters.tfstateKey }}'
 
           - task: AzureCLI@2
             displayName: 'Terraform Destroy (${{ parameters.environmentName }})'
