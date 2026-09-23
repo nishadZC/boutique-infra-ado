@@ -12,6 +12,8 @@ parameters:
     default: 'succeeded()'
   - name: acrName
     type: string
+  - name: tfstateKey
+    type: string
 
 stages:
 - stage: Plan_${{ parameters.environmentName }}
@@ -23,10 +25,17 @@ stages:
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-    - task: TerraformInstaller@1
-      displayName: 'Install Terraform'
+    - task: TerraformTask@5
+      displayName: 'Install & Init Terraform'
       inputs:
-        terraformVersion: '1.7.5'
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/azure/environments/${{ parameters.environmentName }}'
+        backendServiceArm: '${{ parameters.azureServiceConnection }}'
+        backendAzureRmResourceGroupName: 'tfstate-rg'
+        backendAzureRmStorageAccountName: 'boutiquetfstate2026v2'
+        backendAzureRmContainerName: 'tfstate'
+        backendAzureRmKey: '${{ parameters.tfstateKey }}'
 
     - task: Bash@3
       displayName: 'IaC Security Scan (Trivy Config)'
@@ -97,10 +106,17 @@ stages:
         deploy:
           steps:
           - checkout: self
-          - task: TerraformInstaller@1
-            displayName: 'Install Terraform'
+          - task: TerraformTask@5
+            displayName: 'Install & Init Terraform'
             inputs:
-              terraformVersion: '1.7.5'
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)/azure/environments/${{ parameters.environmentName }}'
+              backendServiceArm: '${{ parameters.azureServiceConnection }}'
+              backendAzureRmResourceGroupName: 'tfstate-rg'
+              backendAzureRmStorageAccountName: 'boutiquetfstate2026v2'
+              backendAzureRmContainerName: 'tfstate'
+              backendAzureRmKey: '${{ parameters.tfstateKey }}'
 
           - task: DownloadPipelineArtifact@2
             displayName: 'Download Plan'
