@@ -23,13 +23,10 @@ stages:
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-    - task: Bash@3
-      displayName: 'Verify Terraform (pre-installed on agent)'
+    - task: TerraformInstaller@1
+      displayName: 'Install Terraform'
       inputs:
-        targetType: 'inline'
-        script: |
-          terraform version
-          echo "Terraform is ready on self-hosted agent."
+        terraformVersion: '1.7.5'
 
     - task: Bash@3
       displayName: 'IaC Security Scan (Trivy Config)'
@@ -100,13 +97,10 @@ stages:
         deploy:
           steps:
           - checkout: self
-          - task: Bash@3
-            displayName: 'Verify Terraform (pre-installed on agent)'
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform'
             inputs:
-              targetType: 'inline'
-              script: |
-                terraform version
-                echo "Terraform is ready on self-hosted agent."
+              terraformVersion: '1.7.5'
 
           - task: DownloadPipelineArtifact@2
             displayName: 'Download Plan'
