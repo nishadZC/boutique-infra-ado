@@ -25,8 +25,13 @@ stages:
     pool:
       vmImage: 'ubuntu-latest'
     steps:
+    - task: TerraformInstaller@1
+      displayName: 'Install Terraform CLI'
+      inputs:
+        terraformVersion: '1.7.5'
+
     - task: TerraformTask@5
-      displayName: 'Install & Init Terraform'
+      displayName: 'Init Terraform'
       inputs:
         provider: 'azurerm'
         command: 'init'
@@ -104,8 +109,13 @@ stages:
         deploy:
           steps:
           - checkout: self
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform CLI'
+            inputs:
+              terraformVersion: '1.7.5'
+
           - task: TerraformTask@5
-            displayName: 'Install & Init Terraform'
+            displayName: 'Init Terraform'
             inputs:
               provider: 'azurerm'
               command: 'init'
