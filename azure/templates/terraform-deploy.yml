@@ -45,9 +45,10 @@ stages:
         inlineScript: |
           set -e
           export ARM_CLIENT_ID=$servicePrincipalId
-          export ARM_CLIENT_SECRET=$servicePrincipalKey
           export ARM_TENANT_ID=$tenantId
           export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+          export ARM_USE_OIDC=true
+          export ARM_OIDC_TOKEN=$idToken
 
           cd azure/environments/${{ parameters.environmentName }}
 
@@ -116,9 +117,10 @@ stages:
               inlineScript: |
                 set -e
                 export ARM_CLIENT_ID=$servicePrincipalId
-                export ARM_CLIENT_SECRET=$servicePrincipalKey
                 export ARM_TENANT_ID=$tenantId
                 export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                export ARM_USE_OIDC=true
+                export ARM_OIDC_TOKEN=$idToken
 
                 cd azure/environments/${{ parameters.environmentName }}
                 terraform init
@@ -146,10 +148,17 @@ stages:
                 GITOPS_PAT: $(GITOPS_PAT)
               inputs:
                 azureSubscription: '${{ parameters.azureServiceConnection }}'
+                addSpnToEnvironment: true
                 scriptType: 'bash'
                 scriptLocation: 'inlineScript'
                 inlineScript: |
                   set -e
+                  export ARM_CLIENT_ID=$servicePrincipalId
+                  export ARM_TENANT_ID=$tenantId
+                  export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                  export ARM_USE_OIDC=true
+                  export ARM_OIDC_TOKEN=$idToken
+
                   export RG_NAME=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw resource_group_name)
                   export CLUSTER_NAME=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw cluster_name)
 
@@ -188,9 +197,10 @@ stages:
                 inlineScript: |
                   set -e
                   export ARM_CLIENT_ID=$servicePrincipalId
-                  export ARM_CLIENT_SECRET=$servicePrincipalKey
                   export ARM_TENANT_ID=$tenantId
                   export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                  export ARM_USE_OIDC=true
+                  export ARM_OIDC_TOKEN=$idToken
                   
                   CLIENT_ID=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw app_identity_client_id)
                   CERT_MANAGER_CLIENT_ID=$(terraform -chdir=azure/environments/${{ parameters.environmentName }} output -raw cert_manager_client_id)
