@@ -1,0 +1,27 @@
+# The single public TLS certificate for this environment's hostname. Issued once
+# here and reflected into each namespace whose Ingress serves that hostname, so a
+# rebuild costs one Let's Encrypt issuance instead of one per Ingress.
+# APP_HOST, CLUSTER_ISSUER and EDGE_TLS_NAMESPACES are substituted by
+# platform/scripts/deploy.sh.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: edge-tls
+  namespace: cert-manager
+spec:
+  secretName: edge-tls
+  dnsNames:
+    - "${APP_HOST}"
+  issuerRef:
+    kind: ClusterIssuer
+    name: "${CLUSTER_ISSUER}"
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  secretTemplate:
+    annotations:
+      reflector.v1.k8s.emberstack.com/reflection-allowed: "true"
+      reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces: "${EDGE_TLS_NAMESPACES}"
+      reflector.v1.k8s.emberstack.com/reflection-auto-enabled: "true"
+      reflector.v1.k8s.emberstack.com/reflection-auto-namespaces: "${EDGE_TLS_NAMESPACES}"

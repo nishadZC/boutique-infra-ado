@@ -1,0 +1,9 @@
+# The workload identity client ID is injected at deploy time from Terraform
+# output (cert_manager_client_id), see platform/scripts/deploy.sh.
+crds:
+  enabled: true
+podLabels:
+  azure.workload.identity/use: "true"
+serviceAccount:
+  labels:
+    azure.workload.identity/use: "true"

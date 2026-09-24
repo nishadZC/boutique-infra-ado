@@ -1,0 +1,73 @@
+parameters:
+  - name: environmentName
+    type: string
+  - name: azureServiceConnection
+    type: string
+    default: 'Azure Resource Group'
+  - name: dependsOn
+    type: object
+    default: ['Validate']
+  - name: acmeEmail
+    type: string
+  - name: clusterIssuer
+    type: string
+    default: 'letsencrypt-prod'
+
+stages:
+- stage: Platform_${{ parameters.environmentName }}
+  displayName: 'Deploy Platform (${{ parameters.environmentName }})'
+  dependsOn: ${{ parameters.dependsOn }}
+  condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
+  jobs:
+  - deployment: DeployPlatform
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'azure-${{ parameters.environmentName }}-environment' # Same approval gate as the infra Apply stage
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          - task: TerraformInstaller@1
+            displayName: 'Install Terraform CLI'
+            inputs:
+              terraformVersion: '1.7.5'
+
+          - task: HelmInstaller@1
+            displayName: 'Install Helm'
+            inputs:
+              helmVersionToInstall: 'v3.15.4'
+
+          - task: AzureCLI@2
+            displayName: 'Install platform add-ons (${{ parameters.environmentName }})'
+            inputs:
+              azureSubscription: '${{ parameters.azureServiceConnection }}'
+              addSpnToEnvironment: true
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                set -euo pipefail
+                export ARM_CLIENT_ID=$servicePrincipalId
+                export ARM_TENANT_ID=$tenantId
+                export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                export ARM_USE_OIDC=true
+                export ARM_OIDC_TOKEN=$idToken
+
+                # Read-only: the platform layer consumes the infra layer's outputs
+                # instead of having them committed anywhere.
+                TF="terraform -chdir=azure/environments/${{ parameters.environmentName }}"
+                $TF init -input=false >/dev/null
+                RG_NAME=$($TF output -raw resource_group_name)
+                CLUSTER_NAME=$($TF output -raw cluster_name)
+                export TENANT_ID=$tenantId
+                export KV_URL=$($TF output -raw keyvault_uri)
+                export ESO_CLIENT_ID=$($TF output -raw app_identity_client_id)
+                export CERT_MANAGER_CLIENT_ID=$($TF output -raw cert_manager_client_id)
+                export APP_HOST=$($TF output -raw app_gateway_fqdn)
+                export ACME_EMAIL='${{ parameters.acmeEmail }}'
+                export CLUSTER_ISSUER='${{ parameters.clusterIssuer }}'
+
+                az aks get-credentials --resource-group "$RG_NAME" --name "$CLUSTER_NAME" --admin --overwrite-existing
+
+                bash platform/scripts/deploy.sh ${{ parameters.environmentName }}

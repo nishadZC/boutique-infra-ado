@@ -65,4 +65,26 @@ resource "azurerm_application_gateway" "appgw" {
     policy_type = "Predefined"
     policy_name = "AppGwSslPolicy20220101"
   }
+
+  # AGIC owns the routing config: it rewrites listeners, rules, pools, probes and
+  # TLS certificates from the cluster's Ingress objects. The blocks above are only
+  # the placeholders Azure requires at creation time. Without this, every
+  # terraform apply would revert AGIC's config and break routing and HTTPS until
+  # AGIC reconciles again.
+  lifecycle {
+    ignore_changes = [
+      tags,
+      backend_address_pool,
+      backend_http_settings,
+      frontend_port,
+      http_listener,
+      probe,
+      redirect_configuration,
+      request_routing_rule,
+      rewrite_rule_set,
+      ssl_certificate,
+      trusted_root_certificate,
+      url_path_map,
+    ]
+  }
 }

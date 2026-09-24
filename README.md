@@ -6,7 +6,6 @@
 boutique-infra/
 ├── azure/
 │   ├── environments/
-│   │   ├── shared/      # ACR (non-prod + prod) — provisioned FIRST
 │   │   ├── dev/         # Development environment
 │   │   ├── qa/          # QA environment
 │   │   ├── staging/     # Staging / UAT environment
@@ -18,12 +17,16 @@ boutique-infra/
 │   │   ├── aks/              # Azure Kubernetes Service
 │   │   ├── app_gateway/      # Application Gateway (AGIC)
 │   │   ├── keyvault/         # Key Vault
+│   │   ├── maps/             # Azure Maps account
 │   │   ├── network/          # VNet, subnets, NSGs, Bastion
 │   │   └── postgres/         # PostgreSQL Flexible Server
 │   └── templates/
 │       ├── terraform-deploy.yml   # Reusable plan + apply template
-│       └── terraform-destroy.yml  # Reusable destroy template
-├── azure-pipelines-infra.yml      # Main infrastructure pipeline
+│       ├── terraform-destroy.yml  # Reusable destroy template
+│       └── platform-deploy.yml    # Reusable platform add-ons template
+├── platform/                      # Cluster add-ons: versions, values, manifests, deploy.sh
+├── azure-pipelines-infra.yml      # Infrastructure pipeline (Terraform)
+├── azure-pipelines-platform.yml   # Platform pipeline (Helm add-ons)
 ├── azure-pipelines-destroy.yml    # Destroy pipeline
 └── .gitignore
 ```
@@ -32,7 +35,6 @@ boutique-infra/
 
 | Environment | VNet CIDR      | State Key                  |
 |-------------|----------------|----------------------------|
-| shared      | 10.0.0.0/16    | shared.terraform.tfstate   |
 | dev         | 10.1.0.0/16    | dev2.terraform.tfstate     |
 | qa          | 10.3.0.0/16    | qa.terraform.tfstate       |
 | staging     | 10.4.0.0/16    | staging.terraform.tfstate  |
@@ -40,28 +42,31 @@ boutique-infra/
 
 ## Container Registry Strategy
 
-| Registry             | SKU      | Used By              | CI Push? |
-|----------------------|----------|----------------------|----------|
-| `boutiqueacrshared9p2x4`  | Standard | dev, qa, staging     | ✅ Yes   |
-| `boutiqueacrprod9p2x4`    | Premium  | prod only            | ❌ Never |
+Each environment has its own ACR, created by its Terraform (`module "acr"`), and its AKS
+kubelet identity has `AcrPull` on that registry only. The registry names come from the
+`acr-registries` variable group (`devAcr`, `qaAcr`, `stagingAcr`, `prodAcr`).
 
-Images are **promoted** (not rebuilt) from `boutiqueacrshared9p2x4` → `boutiqueacrprod9p2x4` via `az acr import` after staging passes and a manual approval is granted.
+CI currently pushes to the dev ACR only. Moving an image to a higher environment is part of
+that environment's app Release pipeline (`az acr import` of the already-tested tag — images
+are promoted, never rebuilt), not of the infrastructure pipeline.
 
-## Pipeline Flow
+## Pipelines
 
 ```
-shared → dev → qa → staging → [Approve] → Promote Images → [Approve] → prod
+infra pipeline      Plan → Apply (per env)                 azure-pipelines-infra.yml
+platform pipeline   Validate → Deploy Platform (per env)   azure-pipelines-platform.yml
+app CI              CodeQuality → Test → BuildAndScan      boutique-app/azure-pipelines.yml
+app Release         helm upgrade --install (per env)       Azure DevOps Releases
+destroy pipeline    Plan Destroy → Destroy (per env)       azure-pipelines-destroy.yml
 ```
 
 ### Azure DevOps Environments Required
 
 | Environment Name                | Approval Required |
 |---------------------------------|-------------------|
-| `azure-shared-environment`      | ❌ No             |
 | `azure-dev-environment`         | ❌ No             |
 | `azure-qa-environment`          | Optional          |
 | `azure-staging-environment`     | Optional          |
-| `azure-prod-promote-environment`| ✅ Yes            |
 | `azure-prod-environment`        | ✅ Yes            |
 
 ## Azure DevOps Variable Group
@@ -80,8 +85,6 @@ The following secrets must be set in an Azure DevOps Variable Group linked to th
 | `TF_VAR_azure_maps_subscription_key` | Azure Maps key                            | ✅     |
 | `TF_VAR_razorpay_key_id`         | Razorpay key ID                                | ✅     |
 | `TF_VAR_razorpay_key_secret`     | Razorpay key secret                            | ✅     |
-| `GITOPS_PAT`                     | Azure DevOps PAT for boutique-gitops repo      | ✅     |
-| `IMAGE_TAG`                      | Git commit SHA of the image to promote to prod | ❌     |
 
 ## Security Standards
 
@@ -92,31 +95,71 @@ The following secrets must be set in an Azure DevOps Variable Group linked to th
 
 ## Running from Scratch
 
-### Step 1 — Provision Shared Resources (ACR)
-Run the **Boutique Infrastructure Pipeline** with `runShared = true`.
-The shared stage runs first. All other environments depend on its completion.
+### Step 1 — Infrastructure
+Run the **infra pipeline**. By default it plans and applies **dev** only; approve the Apply
+stage in the `azure-dev-environment` environment.
 
-### Step 2 — Provision Environments Sequentially
-The pipeline automatically provisions dev → qa → staging. Prod requires two manual approvals.
+### Step 2 — Environments beyond dev
+Tick `runQa`, `runStaging` or `runProd` at queue time. Each environment waits for the previous
+one when both are in the same run.
 
 ### Selective Runs
 When you only changed one environment's infra (e.g. `qa`), you don't need to re-run everything before it. Queue the pipeline manually and set the `run*` parameters to skip environments you haven't touched:
 
 | Parameter        | Controls                          |
 |-------------------|------------------------------------|
-| `runShared`       | Plan/Apply `shared`               |
 | `runDev`          | Plan/Apply `dev`                  |
 | `runQa`           | Plan/Apply `qa`                   |
 | `runStaging`      | Plan/Apply `staging`              |
-| `runProdRelease`  | Promote images + Plan/Apply `prod`|
+| `runProd`         | Plan/Apply `prod`                 |
 
-Each stage only depends on the previous one if that previous stage is included in the same run — e.g. set `runShared=false, runDev=false, runQa=true` to apply `qa` on its own against already-provisioned `shared`/`dev` state. All default to `true`, so an unattended run (or a PR validation build, which always uses the defaults) still plans/applies the full stack.
+Each stage only depends on the previous one if that previous stage is included in the same run — e.g. set `runDev=false, runQa=true` to apply `qa` on its own. Only `runDev` defaults to `true`; QA, Staging and Prod are opt-in at queue time until those environments are needed. The platform and destroy pipelines follow the same rule (platform: dev only; destroy: nothing by default).
 
-### Step 3 — GitOps Handoff
-After each environment's `Apply` stage, the pipeline automatically:
-1. Installs ArgoCD on the AKS cluster
-2. Connects ArgoCD to the `boutique-gitops` repo
-3. Injects Workload Identity client IDs and Key Vault URLs into the gitops manifests
+### Step 3 — Platform Add-ons
+Run the **Platform pipeline** (`azure-pipelines-platform.yml`) for the environment. It reads the
+environment's Terraform outputs (Key Vault URL, workload identity client IDs) and runs
+`platform/scripts/deploy.sh`, which installs, in order:
+
+1. **external-secrets** + the `azure-store` `ClusterSecretStore` (Key Vault via workload identity)
+2. **cert-manager** + the `letsencrypt-staging` / `letsencrypt-prod` `ClusterIssuer`s
+3. **reflector** + the `edge-tls` `Certificate` for the environment's hostname, reflected into
+   `boutique-app` and `monitoring`
+4. **kube-prometheus-stack**, after its `grafana-admin-secret` and `pagerduty-secret` ExternalSecrets are synced
+
+#### Public endpoints and TLS
+
+Each environment has one stable hostname, `<prefix>-boutique.<region>.cloudapp.azure.com`
+(`terraform output app_gateway_fqdn`), served by App Gateway through AGIC:
+
+| URL | Backend | Exposure |
+|---|---|---|
+| `https://<host>/` and `/api` | boutique frontend / gateway | public |
+| `https://<host>/grafana` | Grafana (admin login from Key Vault) | public, login required |
+| Prometheus, Alertmanager | ClusterIP only | `kubectl port-forward` |
+
+- **One certificate per environment.** `edge-tls` is issued once by cert-manager (HTTP-01 via AGIC)
+  and copied by reflector into every namespace with an Ingress on that host, so a rebuild costs
+  one Let's Encrypt issuance (limit: 5 per week for the same hostname). Renewal is automatic.
+- **HTTP→HTTPS redirect happens in the frontend's nginx** (`X-Forwarded-Proto` + HSTS), not with
+  AGIC's `ssl-redirect`, which would also redirect the HTTP-01 challenge and break renewals.
+- **AGIC owns App Gateway's routing config.** The `app_gateway` module ignores changes to
+  listeners, rules, pools, probes and certificates so `terraform apply` does not undo AGIC.
+- With a real domain, the standard upgrade is an Azure DNS zone plus DNS-01 validation (cert-manager
+  already has a workload identity for it), a wildcard certificate, and a separate `grafana.<domain>`.
+
+Chart versions are pinned in `platform/versions.env`; values live in `platform/values/<chart>/values.yaml`
+(add `values-<env>.yaml` next to it for per-environment overrides). The pipeline also runs on changes
+under `platform/**`. To run it by hand against the current kubectl context:
+
+```bash
+TENANT_ID=... KV_URL=... ESO_CLIENT_ID=... CERT_MANAGER_CLIENT_ID=... ACME_EMAIL=... \
+  platform/scripts/deploy.sh dev
+platform/scripts/deploy.sh dev --template   # render only, no cluster needed
+```
+
+### Step 4 — Application
+Run the app's Release pipeline. The app chart needs the CRDs, `ClusterSecretStore` and
+`ClusterIssuer`s from Step 3, so Step 3 must have completed first.
 
 ### Teardown
 Run the **Destroy Infrastructure** pipeline. It runs `terraform plan -destroy` first; review the plan, then approve to proceed.

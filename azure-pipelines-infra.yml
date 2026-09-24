@@ -7,8 +7,12 @@ pr:
   paths:
     include:
       - azure/environments/**
-      - azure/templates/**
+      - azure/modules/**
+      - azure/templates/terraform-*.yml
+      - azure-pipelines-infra.yml
 
+# Only dev is provisioned for now. QA/Staging/Prod stay in the pipeline but are
+# opt-in: tick them at queue time once those environments are wanted.
 parameters:
   - name: runDev
     displayName: "Run Dev Environment"
@@ -17,15 +21,15 @@ parameters:
   - name: runQa
     displayName: "Run QA Environment"
     type: boolean
-    default: true
+    default: false
   - name: runStaging
     displayName: "Run Staging Environment"
     type: boolean
-    default: true
-  - name: runProdRelease
-    displayName: "Run Promote + Prod"
+    default: false
+  - name: runProd
+    displayName: "Run Prod Environment"
     type: boolean
-    default: true
+    default: false
 
 variables:
   - group: acr-registries
@@ -78,63 +82,11 @@ stages:
           dependsOn: []
 
   # ==========================================
-  # PROMOTE IMAGES: staging-acr → prod-acr
-  # Runs after staging is verified and approved.
-  # Copies only the validated image tags to the prod ACR.
-  # Prod AKS has AcrPull on prod-acr only — it cannot pull from staging-acr.
-  # Gated behind runProdRelease so lower-env-only runs can skip it.
+  # PROD ENVIRONMENT
+  # Image promotion to the prod ACR is an application release concern and
+  # belongs in the prod Release pipeline, not here.
   # ==========================================
-  - ${{ if eq(parameters.runProdRelease, true) }}:
-    - stage: Promote_Images_To_Prod
-      displayName: 'Promote Images to Prod ACR'
-      ${{ if eq(parameters.runStaging, true) }}:
-        dependsOn: ['Apply_staging']
-        condition: and(succeeded('Apply_staging'), ne(variables['Build.Reason'], 'PullRequest'))
-      ${{ else }}:
-        dependsOn: []
-        condition: ne(variables['Build.Reason'], 'PullRequest')
-      jobs:
-      - deployment: PromoteImages
-        pool:
-          vmImage: 'ubuntu-latest'
-        environment: 'azure-prod-promote-environment' # Manual approval gate: confirms staging passed before images go to prod ACR
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-              - task: AzureCLI@2
-                displayName: 'Copy images from staging-acr to prod-acr'
-                inputs:
-                  azureSubscription: $(azureServiceConnection)
-                  scriptType: 'bash'
-                  scriptLocation: 'inlineScript'
-                  inlineScript: |
-                    set -e
-                    echo "Promoting image tag: $(IMAGE_TAG)"
-
-                    STAGING_ACR="$(stagingAcr).azurecr.io"
-                    PROD_ACR="$(prodAcr).azurecr.io"
-
-                    # Login to both registries
-                    az acr login --name $(stagingAcr)
-                    az acr login --name $(prodAcr)
-
-                    # Copy each service image from staging (last validated env) → prod ACR
-                    # az acr import is atomic and doesn't require docker daemon
-                    for SERVICE in backend frontend; do
-                      echo "Promoting $SERVICE:$(IMAGE_TAG)"
-                      az acr import \
-                        --name $(prodAcr) \
-                        --source $STAGING_ACR/$SERVICE:$(IMAGE_TAG) \
-                        --image $SERVICE:$(IMAGE_TAG) \
-                        --force
-                    done
-
-                    echo "Promotion complete. Prod ACR now has image tag: $(IMAGE_TAG)"
-
-    # ==========================================
-    # PROD ENVIRONMENT
-    # ==========================================
+  - ${{ if eq(parameters.runProd, true) }}:
     - template: azure/templates/terraform-deploy.yml
       parameters:
         environmentName: 'prod'
@@ -142,5 +94,7 @@ stages:
         acrName: $(prodAcr)
         ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
           dependsOn: []
+        ${{ elseif eq(parameters.runStaging, true) }}:
+          dependsOn: ['Apply_staging']
         ${{ else }}:
-          dependsOn: ['Promote_Images_To_Prod']
+          dependsOn: []

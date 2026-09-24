@@ -1,0 +1,7 @@
+# Reflector copies the edge TLS secret (platform/manifests/edge-certificate.yaml)
+# from cert-manager's namespace into every namespace with an Ingress on the
+# environment's hostname. Chart defaults are sufficient.
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi

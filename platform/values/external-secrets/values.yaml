@@ -1,0 +1,14 @@
+# The workload identity client ID is injected at deploy time from Terraform
+# output (app_identity_client_id), see platform/scripts/deploy.sh.
+installCRDs: true
+podLabels:
+  azure.workload.identity/use: "true"
+webhook:
+  port: 9443
+  podLabels:
+    azure.workload.identity/use: "true"
+certController:
+  readinessProbe:
+    enabled: false
+  podLabels:
+    azure.workload.identity/use: "true"

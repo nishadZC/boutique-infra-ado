@@ -1,0 +1,104 @@
+# Platform pipeline: installs the cluster add-ons (external-secrets,
+# cert-manager, kube-prometheus-stack) on top of an environment that the
+# infra pipeline (azure-pipelines-infra.yml) has already provisioned.
+#
+# Order per environment: infra pipeline -> this pipeline -> app Release pipeline.
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - platform/**
+      - azure-pipelines-platform.yml
+      - azure/templates/platform-deploy.yml
+
+# Azure Repos ignores this block; add a build validation branch policy on main
+# pointing at this pipeline to run the Validate stage on PRs.
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - platform/**
+      - azure-pipelines-platform.yml
+      - azure/templates/platform-deploy.yml
+
+parameters:
+  - name: runDev
+    displayName: "Deploy platform to Dev"
+    type: boolean
+    default: true
+  - name: runQa
+    displayName: "Deploy platform to QA"
+    type: boolean
+    default: false
+  - name: runStaging
+    displayName: "Deploy platform to Staging"
+    type: boolean
+    default: false
+  - name: runProd
+    displayName: "Deploy platform to Prod"
+    type: boolean
+    default: false
+
+variables:
+  - name: azureServiceConnection
+    value: 'Azure Resource Group'
+  - name: acmeEmail
+    value: 'vn07244@gmail.com'
+
+stages:
+
+  # ==========================================
+  # VALIDATE: render every chart and manifest without touching a cluster
+  # ==========================================
+  - stage: Validate
+    displayName: 'Validate Platform Config'
+    jobs:
+    - job: Render
+      pool:
+        vmImage: 'ubuntu-latest'
+      steps:
+      - task: HelmInstaller@1
+        displayName: 'Install Helm'
+        inputs:
+          helmVersionToInstall: 'v3.15.4'
+      - script: bash platform/scripts/deploy.sh dev --template
+        displayName: 'helm template (dev values)'
+
+  - ${{ if eq(parameters.runDev, true) }}:
+    - template: azure/templates/platform-deploy.yml
+      parameters:
+        environmentName: 'dev'
+        azureServiceConnection: $(azureServiceConnection)
+        acmeEmail: $(acmeEmail)
+
+  - ${{ if eq(parameters.runQa, true) }}:
+    - template: azure/templates/platform-deploy.yml
+      parameters:
+        environmentName: 'qa'
+        azureServiceConnection: $(azureServiceConnection)
+        acmeEmail: $(acmeEmail)
+        ${{ if eq(parameters.runDev, true) }}:
+          dependsOn: ['Platform_dev']
+
+  - ${{ if eq(parameters.runStaging, true) }}:
+    - template: azure/templates/platform-deploy.yml
+      parameters:
+        environmentName: 'staging'
+        azureServiceConnection: $(azureServiceConnection)
+        acmeEmail: $(acmeEmail)
+        ${{ if eq(parameters.runQa, true) }}:
+          dependsOn: ['Platform_qa']
+
+  - ${{ if eq(parameters.runProd, true) }}:
+    - template: azure/templates/platform-deploy.yml
+      parameters:
+        environmentName: 'prod'
+        azureServiceConnection: $(azureServiceConnection)
+        acmeEmail: $(acmeEmail)
+        ${{ if eq(parameters.runStaging, true) }}:
+          dependsOn: ['Platform_staging']

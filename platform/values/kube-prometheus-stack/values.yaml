@@ -1,0 +1,105 @@
+grafana:
+  service:
+    type: ClusterIP
+  # Created by platform/manifests/externalsecret-grafana-admin.yaml
+  admin:
+    existingSecret: grafana-admin-secret
+    userKey: admin-user
+    passwordKey: admin-password
+  # Served at https://<env host>/grafana through App Gateway (AGIC). The host,
+  # TLS block and root_url are environment-specific and injected by
+  # platform/scripts/deploy.sh; the edge-tls secret is reflected in from
+  # cert-manager's namespace.
+  ingress:
+    enabled: true
+    annotations:
+      kubernetes.io/ingress.class: azure/application-gateway
+      appgw.ingress.kubernetes.io/health-probe-path: /api/health
+    path: /grafana
+    pathType: Prefix
+  grafana.ini:
+    server:
+      serve_from_sub_path: true
+    security:
+      cookie_secure: true
+  # Dashboards and datasources are provisioned from ConfigMaps/Secrets by the
+  # sidecar, and the admin login comes from Key Vault, so Grafana needs no
+  # persistent volume.
+  persistence:
+    enabled: false
+  serviceMonitor:
+    relabelings:
+      - action: replace
+        targetLabel: job
+        replacement: grafana
+
+prometheus:
+  service:
+    type: ClusterIP
+  prometheusSpec:
+    retention: 7d
+    retentionSize: 15GB
+    # Keep metrics across pod restarts and node upgrades.
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: managed-csi
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+  serviceMonitor:
+    relabelings:
+      - action: replace
+        targetLabel: job
+        replacement: prometheus
+
+# Alertmanager stays ClusterIP and is not exposed directly.
+alertmanager:
+  serviceMonitor:
+    relabelings:
+      - action: replace
+        targetLabel: job
+        replacement: alertmanager
+  alertmanagerSpec:
+    # Created by platform/manifests/externalsecret-pagerduty.yaml
+    secrets:
+      - pagerduty-secret
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: pagerduty
+      group_by: ['alertname', 'namespace', 'job']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      routes:
+        - matchers:
+            - 'severity = critical'
+          receiver: pagerduty
+        - matchers:
+            - 'severity = none'
+          receiver: 'null'
+    receivers:
+      - name: pagerduty
+        pagerduty_configs:
+          - routing_key_file: /etc/alertmanager/secrets/pagerduty-secret/pagerduty-key
+            send_resolved: true
+      - name: 'null'
+
+kube-state-metrics:
+  prometheus:
+    monitor:
+      relabelings:
+        - action: replace
+          targetLabel: job
+          replacement: kube-state-metrics
+
+prometheus-node-exporter:
+  prometheus:
+    monitor:
+      relabelings:
+        - action: replace
+          targetLabel: job
+          replacement: node-exporter

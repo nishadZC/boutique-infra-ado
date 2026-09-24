@@ -22,7 +22,7 @@ module "app_gateway" {
   app_gateway_name    = "${var.prefix}-appgw"
   vnet_name           = module.network.vnet_name
   subnet_id           = module.network.appgw_subnet_id
-  domain_name_label   = "${var.prefix}-app-prod-${random_string.kv_suffix.result}"
+  domain_name_label   = "${var.prefix}-boutique" # stable FQDN across rebuilds: <prefix>-boutique.<region>.cloudapp.azure.com
 }
 
 module "aks" {
