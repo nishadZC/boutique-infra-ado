@@ -124,6 +124,20 @@ resource "azurerm_key_vault_access_policy" "terraform_policy" {
   }
 }
 
+# Shared secret for service-to-service calls (payment -> orders -> products).
+# Generated here so it never lives in a pipeline variable.
+resource "random_password" "internal_api_token" {
+  length  = 48
+  special = false
+}
+
+# Initial password for the store admin (admin@luxatelier.in), which the auth
+# service creates on first start. The admin must replace it at first sign-in.
+resource "random_password" "admin_initial_password" {
+  length  = 24
+  special = false
+}
+
 resource "azurerm_key_vault_secret" "db_secret" {
   name = "boutique-db-secret"
   value = jsonencode({
@@ -139,6 +153,8 @@ resource "azurerm_key_vault_secret" "db_secret" {
     RAZORPAY_KEY_ID             = var.razorpay_key_id
     RAZORPAY_KEY_SECRET         = var.razorpay_key_secret
     JWT_SECRET                  = var.jwt_secret
+    INTERNAL_API_TOKEN          = random_password.internal_api_token.result
+    ADMIN_INITIAL_PASSWORD      = random_password.admin_initial_password.result
   })
   key_vault_id = module.keyvault.id
   depends_on = [
