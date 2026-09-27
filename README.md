@@ -347,9 +347,54 @@ Azure Repos, as above; add a build validation policy to run `Validate` on PRs.
 | `Validate` | installs Helm `v3.15.4` and runs `platform/scripts/deploy.sh dev --template`: renders every chart and manifest with placeholder values, no cluster needed |
 | `Platform_<env>` (deployment, environment `azure-<env>-environment`) | installs Terraform and Helm; `terraform init` + `terraform output` for the env (read-only); `az aks get-credentials --admin`; runs `platform/scripts/deploy.sh <env>`. Skipped on PR builds |
 
+```mermaid
+flowchart TD
+    trigger(["merge to main touching platform/**<br/>or manual run (runDev/runQa/runStaging/runProd)"])
+    trigger --> validate
+
+    subgraph validate ["Validate"]
+        render["deploy.sh dev --template<br/>(helm template + envsubst, no cluster)"]
+    end
+
+    validate --> dev["Platform_dev"]
+    dev --> qa["Platform_qa"]
+    qa --> staging["Platform_staging"]
+    staging --> prod["Platform_prod"]
+
+    subgraph stage ["Each Platform_&lt;env&gt; stage (deployment job)"]
+        direction TB
+        gate{{"approval checks on<br/>azure-&lt;env&gt;-environment"}}
+        login["AzureCLI@2 login (OIDC)"]
+        tfout["terraform output (read-only)<br/>RG, cluster, KV URI, identity client IDs, App Gateway FQDN"]
+        creds["az aks get-credentials --admin"]
+        deploy["deploy.sh &lt;env&gt;"]
+        gate --> login --> tfout --> creds --> deploy
+    end
+
+    subgraph script ["deploy.sh &lt;env&gt; (each step waits for Ready)"]
+        direction TB
+        ns["0. namespaces boutique-app, monitoring"]
+        eso["1. external-secrets + ClusterSecretStore azure-store"]
+        cm["2. cert-manager + ClusterIssuers (Let's Encrypt)"]
+        tls["3. reflector + Certificate edge-tls<br/>(copied into boutique-app, monitoring)"]
+        kps["4. ExternalSecrets grafana-admin, pagerduty<br/>then kube-prometheus-stack (CRDs first on upgrade)"]
+        ns --> eso --> cm --> tls --> kps
+    end
+
+    dev -.-> stage
+    deploy -.-> script
+    prod --> release(["app Release pipeline<br/>(helm upgrade boutique-app)"])
+```
+
+PR builds run only `Validate`; every `Platform_<env>` stage is skipped.
+
 Environment ordering works as in the infra pipeline (`Platform_qa` waits for `Platform_dev` when
-both run, and so on). The ACME account email is the `acmeEmail` variable in the pipeline YAML; the
-issuer used for `edge-tls` is the template parameter `clusterIssuer` (default `letsencrypt-prod`).
+both run, and so on). Each stage waits only for the one directly before it, so skipping a middle
+environment breaks the chain: `runDev=true, runStaging=true` (QA off) makes `Platform_staging`
+depend on `Validate` and run in parallel with `Platform_dev`, not after it. The approval checks on
+`azure-staging-environment` still apply. The ACME account email is the `acmeEmail` variable in the
+pipeline YAML; the issuer used for `edge-tls` is the template parameter `clusterIssuer` (default
+`letsencrypt-prod`).
 
 ### 7.3 Destroy pipeline (`azure-pipelines-destroy.yml`)
 
