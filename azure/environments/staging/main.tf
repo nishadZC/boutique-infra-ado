@@ -126,12 +126,6 @@ resource "random_password" "internal_api_token" {
   special = false
 }
 
-# Initial password for the store admin (admin@luxatelier.in), which the auth
-# service creates on first start. The admin must replace it at first sign-in.
-resource "random_password" "admin_initial_password" {
-  length  = 24
-  special = false
-}
 
 resource "azurerm_key_vault_secret" "db_secret" {
   name = "boutique-db-secret"
@@ -149,7 +143,8 @@ resource "azurerm_key_vault_secret" "db_secret" {
     RAZORPAY_KEY_SECRET         = var.razorpay_key_secret
     JWT_SECRET                  = var.jwt_secret
     INTERNAL_API_TOKEN          = random_password.internal_api_token.result
-    ADMIN_INITIAL_PASSWORD      = random_password.admin_initial_password.result
+    ADMIN_EMAIL                 = var.admin_email
+    ADMIN_INITIAL_PASSWORD      = var.admin_initial_password
   })
   key_vault_id = module.keyvault.id
   depends_on = [

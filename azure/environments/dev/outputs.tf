@@ -45,8 +45,3 @@ output "azure_maps_primary_access_key" {
   description = "Primary subscription key for the dev-only Terraform-managed Azure Maps account."
 }
 
-output "admin_initial_password" {
-  value       = random_password.admin_initial_password.result
-  sensitive   = true
-  description = "One-time initial password for the store admin; it must be changed at first sign-in."
-}

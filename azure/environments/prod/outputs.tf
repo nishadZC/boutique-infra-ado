@@ -39,8 +39,3 @@ output "keyvault_uri" {
   value = module.keyvault.vault_uri
 }
 
-output "admin_initial_password" {
-  value       = random_password.admin_initial_password.result
-  sensitive   = true
-  description = "One-time initial password for the store admin; it must be changed at first sign-in."
-}
