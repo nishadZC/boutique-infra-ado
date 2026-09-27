@@ -75,6 +75,8 @@ stages:
         TF_VAR_grafana_admin_user: $(TF_VAR_grafana_admin_user)
         TF_VAR_grafana_admin_password: $(TF_VAR_grafana_admin_password)
         TF_VAR_jwt_secret: $(TF_VAR_jwt_secret)
+        TF_VAR_admin_email: $(TF_VAR_admin_email)
+        TF_VAR_admin_initial_password: $(TF_VAR_admin_initial_password)
     - task: PublishPipelineArtifact@1
       displayName: 'Publish Plan'
       inputs:
@@ -141,3 +143,5 @@ stages:
               TF_VAR_grafana_admin_user: $(TF_VAR_grafana_admin_user)
               TF_VAR_grafana_admin_password: $(TF_VAR_grafana_admin_password)
               TF_VAR_jwt_secret: $(TF_VAR_jwt_secret)
+              TF_VAR_admin_email: $(TF_VAR_admin_email)
+              TF_VAR_admin_initial_password: $(TF_VAR_admin_initial_password)

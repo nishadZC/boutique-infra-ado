@@ -99,3 +99,22 @@ variable "acr_name" {
   type        = string
   description = "Name of this environment's Azure Container Registry (must be globally unique)"
 }
+
+# Store admin the auth service creates on first start; give these to the owner.
+variable "admin_email" {
+  type      = string
+  sensitive = true
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.admin_email))
+    error_message = "admin_email must be a valid email address."
+  }
+}
+
+variable "admin_initial_password" {
+  type      = string
+  sensitive = true
+  validation {
+    condition     = length(var.admin_initial_password) >= 12
+    error_message = "admin_initial_password must be at least 12 characters (the auth service skips creating the admin otherwise)."
+  }
+}
