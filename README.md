@@ -568,7 +568,7 @@ waits for each step:
 | 1 | `external-secrets` `0.10.4` (charts.external-secrets.io) | `external-secrets` | `manifests/cluster-secret-store.yaml` | `clustersecretstore/azure-store` Ready (3 min) |
 | 2 | `cert-manager` `v1.16.1` (charts.jetstack.io) | `cert-manager` | `manifests/cluster-issuers.yaml` | both ClusterIssuers Ready (3 min) |
 | 3 | `reflector` `10.0.65` (emberstack) | `reflector` | `manifests/edge-certificate.yaml` | `certificate/edge-tls` Ready (15 min, prints ACME state on failure), then the secret in each target namespace |
-| 4 | `kube-prometheus-stack` `56.6.2` (prometheus-community) | `monitoring` | first `externalsecret-grafana-admin.yaml`, `externalsecret-pagerduty.yaml`; after the chart, `cert-manager-monitoring.yaml` (needs its CRDs) | both ExternalSecrets Ready (3 min); on upgrade, applies the chart's CRDs server-side first (Helm never upgrades CRDs) |
+| 4 | `kube-prometheus-stack` `56.6.2` (prometheus-community) | `monitoring` | first `externalsecret-grafana-admin.yaml`, `externalsecret-pagerduty.yaml` | both ExternalSecrets Ready (3 min); on upgrade, applies the chart's CRDs server-side first (Helm never upgrades CRDs) |
 
 Every `helm upgrade --install` uses `--wait --timeout 10m`. Manifests are rendered with
 `envsubst` and applied with up to 10 retries (webhooks can take a moment to serve).
@@ -644,14 +644,8 @@ one-time code from `http://<host>/.well-known/acme-challenge/...` through App Ga
 `letsencrypt-staging` while testing: it has generous rate limits, but browsers don't trust its
 certificates.
 
-![What happens over a certificate's 90 days](docs/images/tls-renewal-timeline.png)
-
-Let's Encrypt certificates last 90 days; cert-manager renews `edge-tls` about 30 days before expiry,
-so normally nothing happens on day 90. If renewal keeps failing, the old certificate still works
-until day 90, then browsers show a security warning. Let's Encrypt no longer emails expiry warnings,
-so Prometheus watches cert-manager instead (`platform/manifests/cert-manager-monitoring.yaml`):
-`CertificateExpiringSoon` (warning, < 21 days left), `CertificateExpiryCritical` (critical, < 7 days),
-`CertificateNotReady` and `CertManagerDown`.
+Let's Encrypt certificates last 90 days; cert-manager renews `edge-tls` automatically about 30
+days before expiry.
 
 
 Each environment has one stable hostname, `<prefix>-boutique.<region>.cloudapp.azure.com`

@@ -4,9 +4,8 @@
 #   2. cert-manager      + Let's Encrypt ClusterIssuers
 #   3. reflector         + the environment's edge TLS certificate (edge-tls)
 #   4. kube-prometheus-stack (+ its Grafana/PagerDuty ExternalSecrets),
-#      with Grafana served at https://$APP_HOST/grafana, every metric and alert
-#      labelled environment=<environment>, and cert-manager monitoring
-#      (certificate expiry alerts)
+#      with Grafana served at https://$APP_HOST/grafana, and every metric and
+#      alert labelled environment=<environment>
 #
 # Usage:
 #   platform/scripts/deploy.sh <environment>             # install/upgrade
@@ -221,8 +220,6 @@ if helm status kube-prometheus-stack -n monitoring >/dev/null 2>&1; then
   kubectl apply --server-side --force-conflicts -f "$WORK/kube-prometheus-stack/charts/crds/crds/"
 fi
 install_kube_prometheus_stack
-# Needs the ServiceMonitor/PrometheusRule CRDs, so it comes after the chart.
-apply_manifest cert-manager-monitoring.yaml
 
 log "platform deploy complete"
 helm list -A --filter 'external-secrets|cert-manager|reflector|kube-prometheus-stack'
