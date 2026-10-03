@@ -1,8 +1,3 @@
-# The single public TLS certificate for this environment's hostname. Issued once
-# here and reflected into each namespace whose Ingress serves that hostname, so a
-# rebuild costs one Let's Encrypt issuance instead of one per Ingress.
-# APP_HOST, CLUSTER_ISSUER and EDGE_TLS_NAMESPACES are substituted by
-# platform/scripts/deploy.sh.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:

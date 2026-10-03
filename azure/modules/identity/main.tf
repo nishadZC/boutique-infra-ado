@@ -57,9 +57,6 @@ resource "azurerm_role_assignment" "agic_network_contributor" {
   principal_id         = var.ingress_application_gateway_identity
 }
 
-# Grant AcrPull on the correct ACR:
-# - prod environment: pulls from prod_acr_id (isolated, only promoted images)
-# - dev/qa/staging:   pulls from shared_acr_id (CI builds land here first)
 resource "azurerm_role_assignment" "aks_acr_pull" {
   scope                = coalesce(var.prod_acr_id, var.shared_acr_id)
   role_definition_name = "AcrPull"

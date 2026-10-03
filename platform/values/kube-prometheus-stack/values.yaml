@@ -1,15 +1,10 @@
 grafana:
   service:
     type: ClusterIP
-  # Created by platform/manifests/externalsecret-grafana-admin.yaml
   admin:
     existingSecret: grafana-admin-secret
     userKey: admin-user
     passwordKey: admin-password
-  # Served at https://<env host>/grafana through App Gateway (AGIC). The host,
-  # TLS block and root_url are environment-specific and injected by
-  # platform/scripts/deploy.sh; the edge-tls secret is reflected in from
-  # cert-manager's namespace.
   ingress:
     enabled: true
     annotations:
@@ -22,9 +17,6 @@ grafana:
       serve_from_sub_path: true
     security:
       cookie_secure: true
-  # Dashboards and datasources are provisioned from ConfigMaps/Secrets by the
-  # sidecar, and the admin login comes from Key Vault, so Grafana needs no
-  # persistent volume.
   persistence:
     enabled: false
   serviceMonitor:
@@ -39,7 +31,6 @@ prometheus:
   prometheusSpec:
     retention: 7d
     retentionSize: 15GB
-    # Keep metrics across pod restarts and node upgrades.
     storageSpec:
       volumeClaimTemplate:
         spec:
@@ -54,7 +45,6 @@ prometheus:
         targetLabel: job
         replacement: prometheus
 
-# Alertmanager stays ClusterIP and is not exposed directly.
 alertmanager:
   serviceMonitor:
     relabelings:
@@ -62,7 +52,6 @@ alertmanager:
         targetLabel: job
         replacement: alertmanager
   alertmanagerSpec:
-    # Created by platform/manifests/externalsecret-pagerduty.yaml
     secrets:
       - pagerduty-secret
   config:
@@ -70,7 +59,7 @@ alertmanager:
       resolve_timeout: 5m
     route:
       receiver: pagerduty
-      group_by: ['alertname', 'namespace', 'job']
+      group_by: ['environment', 'alertname', 'namespace', 'job']
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 12h
@@ -86,6 +75,14 @@ alertmanager:
         pagerduty_configs:
           - routing_key_file: /etc/alertmanager/secrets/pagerduty-secret/pagerduty-key
             send_resolved: true
+            severity: '{{ if eq .CommonLabels.severity "critical" }}critical{{ else }}warning{{ end }}'
+            description: '[{{ .CommonLabels.environment | toUpper }}] {{ .CommonLabels.alertname }}{{ with .CommonLabels.namespace }} ({{ . }}){{ end }}'
+            client: 'Alertmanager ({{ .CommonLabels.environment }})'
+            details:
+              environment: '{{ .CommonLabels.environment }}'
+              summary: '{{ .CommonAnnotations.summary }}'
+              description: '{{ .CommonAnnotations.description }}'
+              firing: '{{ .Alerts.Firing | len }}'
       - name: 'null'
 
 kube-state-metrics:

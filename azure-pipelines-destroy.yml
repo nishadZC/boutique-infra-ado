@@ -24,9 +24,6 @@ variables:
     value: 'Azure Resource Group'
 
 stages:
-  # ==========================================
-  # DEV ENVIRONMENT DESTROY
-  # ==========================================
   - ${{ if eq(parameters.runDev, true) }}:
     - template: azure/templates/terraform-destroy.yml
       parameters:
@@ -34,9 +31,6 @@ stages:
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(devAcr)
 
-  # ==========================================
-  # QA ENVIRONMENT DESTROY
-  # ==========================================
   - ${{ if eq(parameters.runQa, true) }}:
     - template: azure/templates/terraform-destroy.yml
       parameters:
@@ -44,9 +38,6 @@ stages:
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(qaAcr)
 
-  # ==========================================
-  # STAGING ENVIRONMENT DESTROY
-  # ==========================================
   - ${{ if eq(parameters.runStaging, true) }}:
     - template: azure/templates/terraform-destroy.yml
       parameters:
@@ -54,11 +45,6 @@ stages:
         azureServiceConnection: $(azureServiceConnection)
         acrName: $(stagingAcr)
 
-  # ==========================================
-  # PROD ENVIRONMENT DESTROY
-  # Disabled by default — requires explicitly checking runProdDestroy
-  # at queue time, in addition to the environment approval gate.
-  # ==========================================
   - ${{ if eq(parameters.runProdDestroy, true) }}:
     - template: azure/templates/terraform-destroy.yml
       parameters:

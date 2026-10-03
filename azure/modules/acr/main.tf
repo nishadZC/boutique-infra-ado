@@ -4,7 +4,6 @@ resource "azurerm_container_registry" "acr" {
   location            = var.location
   sku                 = var.sku
 
-  # Industry standard: disable admin account — use RBAC (AcrPull/AcrPush) via Managed Identities
   admin_enabled = false
 
   tags = var.tags

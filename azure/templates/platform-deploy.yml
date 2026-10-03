@@ -22,7 +22,7 @@ stages:
   - deployment: DeployPlatform
     pool:
       vmImage: 'ubuntu-latest'
-    environment: 'azure-${{ parameters.environmentName }}-environment' # Same approval gate as the infra Apply stage
+    environment: 'azure-${{ parameters.environmentName }}-environment'
     strategy:
       runOnce:
         deploy:
@@ -54,8 +54,6 @@ stages:
                 export ARM_USE_OIDC=true
                 export ARM_OIDC_TOKEN=$idToken
 
-                # Read-only: the platform layer consumes the infra layer's outputs
-                # instead of having them committed anywhere.
                 TF="terraform -chdir=azure/environments/${{ parameters.environmentName }}"
                 $TF init -input=false >/dev/null
                 RG_NAME=$($TF output -raw resource_group_name)

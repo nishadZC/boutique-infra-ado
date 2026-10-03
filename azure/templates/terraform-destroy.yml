@@ -69,7 +69,7 @@ stages:
   - deployment: TerraformApplyDestroy
     pool:
       vmImage: 'ubuntu-latest'
-    environment: 'azure-${{ parameters.environmentName }}-environment' # Triggers manual approvals in DevOps
+    environment: 'azure-${{ parameters.environmentName }}-environment'
     strategy:
       runOnce:
         deploy:

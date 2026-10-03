@@ -581,6 +581,12 @@ are generated at run time from Terraform outputs.
 
 Defined in **`platform/manifests/cluster-secret-store.yaml`** and applied by step 1 of `deploy.sh`:
 
+![How secrets get from Azure Key Vault into the cluster](docs/images/secrets-flow.png)
+
+In short: the **ClusterSecretStore** says where the safe (Key Vault) is and how to log in to it, for
+the whole cluster. Each **ExternalSecret** is a shopping list ("fetch key X, save it as Secret Y").
+External Secrets does the fetching every hour; apps only ever read ordinary Kubernetes Secrets.
+
 ```yaml
 apiVersion: external-secrets.io/v1beta1
 kind: ClusterSecretStore
@@ -630,6 +636,18 @@ sequenceDiagram
 
 ### Public endpoints and TLS
 
+![How the site gets its HTTPS certificate](docs/images/tls-certificate-flow.png)
+
+The **ClusterIssuers** (`letsencrypt-prod`, `letsencrypt-staging`) tell cert-manager to get
+certificates from Let's Encrypt and to prove ownership with an HTTP-01 check: Let's Encrypt fetches a
+one-time code from `http://<host>/.well-known/acme-challenge/...` through App Gateway. Use
+`letsencrypt-staging` while testing: it has generous rate limits, but browsers don't trust its
+certificates.
+
+Let's Encrypt certificates last 90 days; cert-manager renews `edge-tls` automatically about 30
+days before expiry.
+
+
 Each environment has one stable hostname, `<prefix>-boutique.<region>.cloudapp.azure.com`
 (`terraform output app_gateway_fqdn`), served by App Gateway through AGIC:
 
@@ -658,6 +676,15 @@ Each environment has one stable hostname, `<prefix>-boutique.<region>.cloudapp.a
 - Prometheus: 7 days / 15 GB retention on a 20Gi `managed-csi` volume.
 - Alertmanager: routes to PagerDuty using the key mounted from `pagerduty-secret`
   (`pagerduty-key` in Key Vault); `severity = none` goes to a null receiver.
+- Every environment has its own Prometheus, Alertmanager and Grafana. `deploy.sh` sets the
+  Prometheus external label `environment=<env>`, so every alert carries it: PagerDuty incidents
+  read `[DEV] HighErrorRate (boutique-app)`, with the environment in the details, and the
+  PagerDuty severity follows the alert's (`critical`, otherwise `warning`).
+- Paging policy lives in PagerDuty, not here: each environment's Key Vault holds its own
+  `pagerduty-key`, so give each environment its own PagerDuty service. Make prod high-urgency (pages
+  the on-call) and dev/qa/staging low-urgency (no phone call).
+- Environment-specific overrides (e.g. longer retention in prod) go in
+  `platform/values/kube-prometheus-stack/values-<env>.yaml`; none exist yet.
 
 ### Running it by hand
 

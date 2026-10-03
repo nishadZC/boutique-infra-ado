@@ -1,8 +1,3 @@
-# Platform pipeline: installs the cluster add-ons (external-secrets,
-# cert-manager, kube-prometheus-stack) on top of an environment that the
-# infra pipeline (azure-pipelines-infra.yml) has already provisioned.
-#
-# Order per environment: infra pipeline -> this pipeline -> app Release pipeline.
 
 trigger:
   branches:
@@ -14,8 +9,6 @@ trigger:
       - azure-pipelines-platform.yml
       - azure/templates/platform-deploy.yml
 
-# Azure Repos ignores this block; add a build validation branch policy on main
-# pointing at this pipeline to run the Validate stage on PRs.
 pr:
   branches:
     include:
@@ -52,9 +45,6 @@ variables:
 
 stages:
 
-  # ==========================================
-  # VALIDATE: render every chart and manifest without touching a cluster
-  # ==========================================
   - stage: Validate
     displayName: 'Validate Platform Config'
     jobs:

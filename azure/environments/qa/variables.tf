@@ -84,7 +84,6 @@ variable "jwt_secret" {
   sensitive = true
 }
 
-
 variable "ssh_public_key" {
   type        = string
   description = "SSH public key for AKS nodes"
@@ -95,7 +94,6 @@ variable "acr_name" {
   description = "Name of this environment's Azure Container Registry (must be globally unique)"
 }
 
-# Store admin the auth service creates on first start; give these to the owner.
 variable "admin_email" {
   type      = string
   sensitive = true

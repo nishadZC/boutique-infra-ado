@@ -56,8 +56,6 @@ stages:
           terraform init
           terraform validate
 
-          # `plan` refreshes state in-memory to detect drift; unlike `apply -refresh-only`
-          # it never persists changes to the backend, so this stays safe to run pre-approval.
           terraform plan -var-file="${{ parameters.environmentName }}.tfvars" -out=$(Build.ArtifactStagingDirectory)/${{ parameters.environmentName }}-tfplan
         addSpnToEnvironment: true
       env:
@@ -92,7 +90,7 @@ stages:
   - deployment: TerraformApply
     pool:
       vmImage: 'ubuntu-latest'
-    environment: 'azure-${{ parameters.environmentName }}-environment' # Allows manual approvals in DevOps
+    environment: 'azure-${{ parameters.environmentName }}-environment'
     strategy:
       runOnce:
         deploy:
