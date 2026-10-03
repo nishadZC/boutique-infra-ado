@@ -3,9 +3,6 @@ output "kube_config" {
   sensitive = true
 }
 
-
-
-
 output "postgres_fqdn" {
   value = module.postgres.fqdn
 }

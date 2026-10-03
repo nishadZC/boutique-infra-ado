@@ -34,7 +34,6 @@ resource "azurerm_subnet" "postgres" {
   }
 }
 
-# Network Security Groups
 resource "azurerm_network_security_group" "aks_nsg" {
   name                = "${var.vnet_name}-aks-nsg"
   location            = var.location

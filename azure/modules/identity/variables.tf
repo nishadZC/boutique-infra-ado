@@ -28,7 +28,6 @@ variable "tenant_id" {
   type        = string
 }
 
-
 variable "app_gateway_id" {
   description = "The ID of the Application Gateway"
   type        = string
@@ -44,15 +43,12 @@ variable "resource_group_id" {
   type        = string
 }
 
-# Non-prod ACR: dev, qa, staging pull from here
 variable "shared_acr_id" {
   description = "The ID of the shared (non-prod) ACR. Used by dev/qa/staging."
   type        = string
   default     = null
 }
 
-# Prod ACR: prod environment pulls exclusively from here
-# Leave null for non-prod environments
 variable "prod_acr_id" {
   description = "The ID of the prod-only ACR. If set, AcrPull is granted here instead of shared_acr_id."
   type        = string

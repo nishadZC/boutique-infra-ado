@@ -22,7 +22,7 @@ module "app_gateway" {
   app_gateway_name    = "${var.prefix}-appgw"
   vnet_name           = module.network.vnet_name
   subnet_id           = module.network.appgw_subnet_id
-  domain_name_label   = "${var.prefix}-boutique" # stable FQDN across rebuilds: <prefix>-boutique.<region>.cloudapp.azure.com
+  domain_name_label   = "${var.prefix}-boutique"
 }
 
 module "aks" {
@@ -36,7 +36,6 @@ module "aks" {
   ssh_public_key      = var.ssh_public_key
 }
 
-
 module "postgres" {
   source              = "../../modules/postgres"
   resource_group_name = module.resource_group.name
@@ -49,8 +48,6 @@ module "postgres" {
 }
 
 data "azurerm_client_config" "current" {}
-
-
 
 resource "random_string" "kv_suffix" {
   length  = 5
@@ -66,7 +63,6 @@ module "keyvault" {
   tenant_id           = data.azurerm_client_config.current.tenant_id
   aks_principal_id    = module.aks.kubelet_identity_object_id
 }
-
 
 module "acr" {
   source              = "../../modules/acr"
@@ -112,20 +108,14 @@ resource "azurerm_key_vault_access_policy" "terraform_policy" {
   ]
 
   lifecycle {
-    # Prevent failure if this policy already exists in Azure from a prior run
-    # Run: terraform import azurerm_key_vault_access_policy.terraform_policy <resource_id>
-    # to bring it under Terraform management without recreating it.
     ignore_changes = all
   }
 }
 
-# Shared secret for service-to-service calls (payment -> orders -> products).
-# Generated here so it never lives in a pipeline variable.
 resource "random_password" "internal_api_token" {
   length  = 48
   special = false
 }
-
 
 resource "azurerm_key_vault_secret" "db_secret" {
   name = "boutique-db-secret"
@@ -163,4 +153,3 @@ resource "azurerm_key_vault_secret" "pagerduty_key" {
   ]
 }
 
-# Role assignments are now managed by the identity module

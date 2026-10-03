@@ -11,8 +11,6 @@ pr:
       - azure/templates/terraform-*.yml
       - azure-pipelines-infra.yml
 
-# Only dev is provisioned for now. QA/Staging/Prod stay in the pipeline but are
-# opt-in: tick them at queue time once those environments are wanted.
 parameters:
   - name: runDev
     displayName: "Run Dev Environment"
@@ -38,9 +36,6 @@ variables:
 
 stages:
 
-  # ==========================================
-  # DEV ENVIRONMENT
-  # ==========================================
   - ${{ if eq(parameters.runDev, true) }}:
     - template: azure/templates/terraform-deploy.yml
       parameters:
@@ -49,9 +44,6 @@ stages:
         acrName: $(devAcr)
         dependsOn: []
 
-  # ==========================================
-  # QA ENVIRONMENT
-  # ==========================================
   - ${{ if eq(parameters.runQa, true) }}:
     - template: azure/templates/terraform-deploy.yml
       parameters:
@@ -65,9 +57,6 @@ stages:
         ${{ else }}:
           dependsOn: []
 
-  # ==========================================
-  # STAGING ENVIRONMENT
-  # ==========================================
   - ${{ if eq(parameters.runStaging, true) }}:
     - template: azure/templates/terraform-deploy.yml
       parameters:
@@ -81,11 +70,6 @@ stages:
         ${{ else }}:
           dependsOn: []
 
-  # ==========================================
-  # PROD ENVIRONMENT
-  # Image promotion to the prod ACR is an application release concern and
-  # belongs in the prod Release pipeline, not here.
-  # ==========================================
   - ${{ if eq(parameters.runProd, true) }}:
     - template: azure/templates/terraform-deploy.yml
       parameters:

@@ -22,7 +22,7 @@ module "app_gateway" {
   app_gateway_name    = "${var.prefix}-appgw"
   vnet_name           = module.network.vnet_name
   subnet_id           = module.network.appgw_subnet_id
-  domain_name_label   = "${var.prefix}-boutique" # stable FQDN across rebuilds: <prefix>-boutique.<region>.cloudapp.azure.com
+  domain_name_label   = "${var.prefix}-boutique"
 }
 
 module "aks" {
@@ -35,7 +35,6 @@ module "aks" {
   app_gateway_id      = module.app_gateway.id
   ssh_public_key      = var.ssh_public_key
 }
-
 
 module "postgres" {
   source              = "../../modules/postgres"
@@ -50,13 +49,12 @@ module "postgres" {
 
 data "azurerm_client_config" "current" {}
 
-# Prod pulls images exclusively from its own ACR (promoted via pipeline from staging's ACR)
 module "acr" {
   source              = "../../modules/acr"
   resource_group_name = module.resource_group.name
   location            = module.resource_group.location
   acr_name            = var.acr_name
-  sku                 = "Premium" # Premium required for geo-replication and private endpoints
+  sku                 = "Premium"
   tags = {
     purpose    = "prod"
     managed_by = "terraform"
@@ -77,7 +75,6 @@ module "keyvault" {
   tenant_id           = data.azurerm_client_config.current.tenant_id
   aks_principal_id    = module.aks.kubelet_identity_object_id
 }
-
 
 module "identity" {
   source                               = "../../modules/identity"
@@ -112,13 +109,10 @@ resource "azurerm_key_vault_access_policy" "terraform_policy" {
   ]
 }
 
-# Shared secret for service-to-service calls (payment -> orders -> products).
-# Generated here so it never lives in a pipeline variable.
 resource "random_password" "internal_api_token" {
   length  = 48
   special = false
 }
-
 
 resource "azurerm_key_vault_secret" "db_secret" {
   name = "boutique-db-secret"
