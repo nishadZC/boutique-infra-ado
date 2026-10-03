@@ -4,7 +4,9 @@
 #   2. cert-manager      + Let's Encrypt ClusterIssuers
 #   3. reflector         + the environment's edge TLS certificate (edge-tls)
 #   4. kube-prometheus-stack (+ its Grafana/PagerDuty ExternalSecrets),
-#      with Grafana served at https://$APP_HOST/grafana
+#      with Grafana served at https://$APP_HOST/grafana, every metric and alert
+#      labelled environment=<environment>, and cert-manager monitoring
+#      (certificate expiry alerts)
 #
 # Usage:
 #   platform/scripts/deploy.sh <environment>             # install/upgrade
@@ -134,9 +136,22 @@ install_cert_manager() {
 install_reflector() {
   helm_release reflector reflector reflector "$REFLECTOR_REPO" "$REFLECTOR_VERSION"
 }
+# Values file labelling everything this environment's Prometheus collects and
+# alerts on, so alerts in Alertmanager and PagerDuty say which environment fired.
+monitoring_env_values() {
+  local file="$WORK/monitoring-env.yaml"
+  cat >"$file" <<EOF
+prometheus:
+  prometheusSpec:
+    externalLabels:
+      environment: "$ENVIRONMENT"
+EOF
+  echo "$file"
+}
+
 install_kube_prometheus_stack() {
   helm_release kube-prometheus-stack monitoring kube-prometheus-stack "$PROMETHEUS_REPO" "$KUBE_PROMETHEUS_STACK_VERSION" \
-    -f "$(grafana_host_values)"
+    -f "$(grafana_host_values)" -f "$(monitoring_env_values)"
 }
 
 if [[ "$MODE" == "--template" ]]; then
@@ -206,6 +221,8 @@ if helm status kube-prometheus-stack -n monitoring >/dev/null 2>&1; then
   kubectl apply --server-side --force-conflicts -f "$WORK/kube-prometheus-stack/charts/crds/crds/"
 fi
 install_kube_prometheus_stack
+# Needs the ServiceMonitor/PrometheusRule CRDs, so it comes after the chart.
+apply_manifest cert-manager-monitoring.yaml
 
 log "platform deploy complete"
 helm list -A --filter 'external-secrets|cert-manager|reflector|kube-prometheus-stack'

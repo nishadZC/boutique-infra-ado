@@ -37,6 +37,9 @@ prometheus:
   service:
     type: ClusterIP
   prometheusSpec:
+    # externalLabels (environment: dev|qa|staging|prod) are injected per
+    # environment by platform/scripts/deploy.sh. Prometheus adds them to every
+    # alert it sends, so Alertmanager and PagerDuty show which environment fired.
     retention: 7d
     retentionSize: 15GB
     # Keep metrics across pod restarts and node upgrades.
@@ -70,7 +73,7 @@ alertmanager:
       resolve_timeout: 5m
     route:
       receiver: pagerduty
-      group_by: ['alertname', 'namespace', 'job']
+      group_by: ['environment', 'alertname', 'namespace', 'job']
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 12h
@@ -82,10 +85,21 @@ alertmanager:
             - 'severity = none'
           receiver: 'null'
     receivers:
+      # Each environment reads pagerduty-key from its own Key Vault, so point
+      # each one at its own PagerDuty service: prod high-urgency (pages
+      # someone), dev/qa/staging low-urgency (no phone call).
       - name: pagerduty
         pagerduty_configs:
           - routing_key_file: /etc/alertmanager/secrets/pagerduty-secret/pagerduty-key
             send_resolved: true
+            severity: '{{ if eq .CommonLabels.severity "critical" }}critical{{ else }}warning{{ end }}'
+            description: '[{{ .CommonLabels.environment | toUpper }}] {{ .CommonLabels.alertname }}{{ with .CommonLabels.namespace }} ({{ . }}){{ end }}'
+            client: 'Alertmanager ({{ .CommonLabels.environment }})'
+            details:
+              environment: '{{ .CommonLabels.environment }}'
+              summary: '{{ .CommonAnnotations.summary }}'
+              description: '{{ .CommonAnnotations.description }}'
+              firing: '{{ .Alerts.Firing | len }}'
       - name: 'null'
 
 kube-state-metrics:

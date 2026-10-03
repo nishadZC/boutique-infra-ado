@@ -30,3 +30,16 @@ override.tf.json
 # example: *tfplan*
 *tfplan*
 .terraform.lock.hcl
+
+# Secrets and local settings
+.env
+.env.*
+*.pem
+*.key
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

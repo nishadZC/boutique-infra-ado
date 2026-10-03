@@ -568,7 +568,7 @@ waits for each step:
 | 1 | `external-secrets` `0.10.4` (charts.external-secrets.io) | `external-secrets` | `manifests/cluster-secret-store.yaml` | `clustersecretstore/azure-store` Ready (3 min) |
 | 2 | `cert-manager` `v1.16.1` (charts.jetstack.io) | `cert-manager` | `manifests/cluster-issuers.yaml` | both ClusterIssuers Ready (3 min) |
 | 3 | `reflector` `10.0.65` (emberstack) | `reflector` | `manifests/edge-certificate.yaml` | `certificate/edge-tls` Ready (15 min, prints ACME state on failure), then the secret in each target namespace |
-| 4 | `kube-prometheus-stack` `56.6.2` (prometheus-community) | `monitoring` | first `externalsecret-grafana-admin.yaml`, `externalsecret-pagerduty.yaml` | both ExternalSecrets Ready (3 min); on upgrade, applies the chart's CRDs server-side first (Helm never upgrades CRDs) |
+| 4 | `kube-prometheus-stack` `56.6.2` (prometheus-community) | `monitoring` | first `externalsecret-grafana-admin.yaml`, `externalsecret-pagerduty.yaml`; after the chart, `cert-manager-monitoring.yaml` (needs its CRDs) | both ExternalSecrets Ready (3 min); on upgrade, applies the chart's CRDs server-side first (Helm never upgrades CRDs) |
 
 Every `helm upgrade --install` uses `--wait --timeout 10m`. Manifests are rendered with
 `envsubst` and applied with up to 10 retries (webhooks can take a moment to serve).
@@ -580,6 +580,12 @@ are generated at run time from Terraform outputs.
 ### The `azure-store` ClusterSecretStore
 
 Defined in **`platform/manifests/cluster-secret-store.yaml`** and applied by step 1 of `deploy.sh`:
+
+![How secrets get from Azure Key Vault into the cluster](docs/images/secrets-flow.png)
+
+In short: the **ClusterSecretStore** says where the safe (Key Vault) is and how to log in to it, for
+the whole cluster. Each **ExternalSecret** is a shopping list ("fetch key X, save it as Secret Y").
+External Secrets does the fetching every hour; apps only ever read ordinary Kubernetes Secrets.
 
 ```yaml
 apiVersion: external-secrets.io/v1beta1
@@ -630,6 +636,24 @@ sequenceDiagram
 
 ### Public endpoints and TLS
 
+![How the site gets its HTTPS certificate](docs/images/tls-certificate-flow.png)
+
+The **ClusterIssuers** (`letsencrypt-prod`, `letsencrypt-staging`) tell cert-manager to get
+certificates from Let's Encrypt and to prove ownership with an HTTP-01 check: Let's Encrypt fetches a
+one-time code from `http://<host>/.well-known/acme-challenge/...` through App Gateway. Use
+`letsencrypt-staging` while testing: it has generous rate limits, but browsers don't trust its
+certificates.
+
+![What happens over a certificate's 90 days](docs/images/tls-renewal-timeline.png)
+
+Let's Encrypt certificates last 90 days; cert-manager renews `edge-tls` about 30 days before expiry,
+so normally nothing happens on day 90. If renewal keeps failing, the old certificate still works
+until day 90, then browsers show a security warning. Let's Encrypt no longer emails expiry warnings,
+so Prometheus watches cert-manager instead (`platform/manifests/cert-manager-monitoring.yaml`):
+`CertificateExpiringSoon` (warning, < 21 days left), `CertificateExpiryCritical` (critical, < 7 days),
+`CertificateNotReady` and `CertManagerDown`.
+
+
 Each environment has one stable hostname, `<prefix>-boutique.<region>.cloudapp.azure.com`
 (`terraform output app_gateway_fqdn`), served by App Gateway through AGIC:
 
@@ -658,6 +682,15 @@ Each environment has one stable hostname, `<prefix>-boutique.<region>.cloudapp.a
 - Prometheus: 7 days / 15 GB retention on a 20Gi `managed-csi` volume.
 - Alertmanager: routes to PagerDuty using the key mounted from `pagerduty-secret`
   (`pagerduty-key` in Key Vault); `severity = none` goes to a null receiver.
+- Every environment has its own Prometheus, Alertmanager and Grafana. `deploy.sh` sets the
+  Prometheus external label `environment=<env>`, so every alert carries it: PagerDuty incidents
+  read `[DEV] HighErrorRate (boutique-app)`, with the environment in the details, and the
+  PagerDuty severity follows the alert's (`critical`, otherwise `warning`).
+- Paging policy lives in PagerDuty, not here: each environment's Key Vault holds its own
+  `pagerduty-key`, so give each environment its own PagerDuty service. Make prod high-urgency (pages
+  the on-call) and dev/qa/staging low-urgency (no phone call).
+- Environment-specific overrides (e.g. longer retention in prod) go in
+  `platform/values/kube-prometheus-stack/values-<env>.yaml`; none exist yet.
 
 ### Running it by hand
 
